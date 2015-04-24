@@ -3,7 +3,7 @@
 
 #include <unordered_map>
 
-#include "TransUtils.hpp"
+#include "../TransUtils.hpp"
 
 const string separator = "\t\s ";
 

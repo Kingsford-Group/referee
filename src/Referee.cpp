@@ -4,8 +4,7 @@
 #include <cstring>
 
 #include "RefereeCompress.hpp"
-#include "Decompressor.hpp"
-// #include "DecompressSAM.hpp"
+#include "decompress/Decompressor.hpp"
 
 using namespace std;
 

@@ -7,7 +7,7 @@
 #include <compress.h>
 #include <chrono>
 
-#include "Compressor.hpp"
+#include "compress/Compressor.hpp"
 
 struct Parser_args {
 	Output_args output;

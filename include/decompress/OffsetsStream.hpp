@@ -2,7 +2,7 @@
 #define OFFSETS_BUFFER_H
 
 #include <memory>
-#include <InputBuffer.hpp>
+#include "decompress/InputBuffer.hpp"
 
 
 class OffsetsStream {
