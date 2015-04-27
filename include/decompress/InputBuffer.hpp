@@ -69,7 +69,7 @@ public:
 	void popNBytes(int n) {
 		if (bytes.size() < n) readMore();
 
-		while (n > 0) {
+		while (n > 0 && bytes.size() > 0) {
 			bytes.pop_front();
 			// current_index++;
 			n--;

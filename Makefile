@@ -5,6 +5,7 @@ CFLAGS=-std=c++11 -O3 -w
 BIN=bin
 LDFLAGS=-L /usr/local/lib/ -L plzip/ -L ~/lib/
 SRC=src/Referee.cpp
+SRCSUPP=src/RefereeSupportTools.cpp
 INCLUDE=-I include/ -I /usr/local/include/ -I plzip/ -I ~/include/
 #LIBS=-lstaden-read -lplzip # -llz
 LIBS=-lstaden-read -lpthread -lplzip
@@ -19,4 +20,5 @@ $(EXE):
 	$(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN)/$@ $(SRC) $(INCLUDE) $(LIBS)
 clean:
 	rm -f $(BIN)/$(EXE)
-
+rsupport:
+	$(CC) $(CFLAGS) $(LDFLAGS) -o $(BIN)/$@ $(SRCSUPP) $(INCLUDE) $(LIBS)

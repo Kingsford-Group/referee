@@ -1,0 +1,11 @@
+samtools depth SRR445718.sam | awk '{sum+=$3} END { print "Average = ",sum/NR}'
+Average =  1.43872
+
+samtools depth SRR1294122.sam | awk '{sum+=$3} END { print "Average = ",sum/NR}'
+Average =  2.29605
+
+samtools depth K562_cytosol_LID8465_TopHat_v2.bam | awk '{sum+=$3} END { print "Average = ",sum/NR}'
+Average =  16.0267
+
+samtools depth P_aeruginosa_PAO1.bam | awk '{sum+=$3} END { print "Average = ",sum/NR}'
+Average =  318.039
