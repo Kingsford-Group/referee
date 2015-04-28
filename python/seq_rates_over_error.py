@@ -45,12 +45,12 @@ print data, edits_data
 fs = 16
 
 # plot bpb against error rate
-for fname, v in edits_data.iteritems():	
-	plt.plot(v, data[fname], "-o", label=fname, markersize=8)
+for fname, error_rates in edits_data.iteritems():	
+	plt.plot(error_rates, data[fname], "-o", label=fname, markersize=8)
 plt.xlabel("Error rate per alignment", fontsize=fs)
 
-error_rate_at_05_srr445718 = 3.43
-error_rate_at_05_srr1224129 = 2.68
+error_rate_at_05_srr445718 = 2.72
+error_rate_at_05_srr1224129 = 1.96
 plt.plot(error_rate_at_05_srr445718,	0.69, "b*", label="SRR445718 (Deez)", markersize=12)
 plt.plot(error_rate_at_05_srr1224129, 	0.46, "g*", label="SRR1294122 (Deez)", markersize=12)
 plt.plot(error_rate_at_05_srr445718, 	0.34, "bp", label="SRR445718 (Quip)", markersize=12)

@@ -173,7 +173,9 @@ private:
 
 	int bootstrap_size = 0;
 
-	int K_c = 3;	
+	int K_c = 3;
+
+	int generic_pile_id = 0;	
 
 	vector<int> cluster_membership;
 
@@ -193,7 +195,7 @@ private:
 		if (mode_frequency < 0.26 * q_v_len) {
 			others->add(q_v, id);
 			// record the the vector when into a general pile
-			cluster_membership.push_back(-1);
+			cluster_membership.push_back(generic_pile_id);
 			return;
 		}
 		else {
@@ -223,12 +225,13 @@ private:
 				else {
 					// store into the sh*tpile
 					others->add(q_v, id);
-					cluster_membership.push_back(-1);
+					cluster_membership.push_back(generic_pile_id);
 				}
 			}
 		}
 	}
 
+	// write a quality value w/o splitting it into prefix, core, suffix
 	void write(string & s, shared_ptr<QualityCluster> c) {
 		auto cig = to_cigar(s);
 		c->writeCore( cig );
@@ -249,7 +252,7 @@ private:
 		if (mode_frequency < 0.26 * q_v_len) {
 			write(q_v, others);
 			// record the the vector when into a general pile
-			cluster_membership.push_back(-1);
+			cluster_membership.push_back(generic_pile_id);
 			return;
 		}
 		else {
@@ -268,7 +271,7 @@ private:
 
 			if (!found) {
 				write(q_v, others);
-				cluster_membership.push_back(-1);
+				cluster_membership.push_back(generic_pile_id);
 			}
 		}
 	}
@@ -277,11 +280,11 @@ private:
 	//
 	///////////////////////////////////////////////////////////
 	void refineClusters() {
-		// allocate enough for the bootstrap vectors, initialize to -1 to idicate
-		// membership in the sh*tpile
-		cluster_membership.resize(observed_vectors, -1);
+		// allocate enough for the bootstrap vectors, initialize to 0 to idicate
+		// membership in the generic pile
+		cluster_membership.resize(observed_vectors, generic_pile_id);
 		cerr << "Initial clusters: " << clusters.size() << endl;
-		int clust_id = 0;
+		int clust_id = generic_pile_id + 1; // all other cluster IDs will have ids starting with 1
 		vector<int> remove;
 		for (auto i = 0; i < clusters.size(); i++) {
 			auto clust = clusters[i];
