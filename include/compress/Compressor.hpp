@@ -377,11 +377,34 @@ private:
 	}
 
 	////////////////////////////////////////////////////////////////
+	// unordered_map<string, int> dictionary;
+	// size_t unique_chunk_id = 0;
+	// string delimiters = ".:_\s#";
 	void handleReadNames(IOLibAlignment & al) {
 		// TODO: need to transform the read IDs before passing it down to the lzip
-		// names_stream << al.read_name() << endl;
 		writeName(al.read_name(), out_buffers.ids_buf);
+
+		// split, diff, minimize!
+		// this can make compression for read ids faster and provide marginal improvements
+		// string read_name = al.read_name();
+		// size_t left = 0;
+		// size_t right = read_name.find_first_of(delimiter);
+		// vector<int> remapped_name;
+		// while (right != string::npos ) {
+		// 	string chunk = read_name.substr(left, right);
+		// 	// if have not seen this before -- add to dictionary, increment unique_id
+		// 	if (dictionary.find(chunk) == dictionary.end() ) {
+		// 		dictionary[chunk] = unique_chunk_id;
+		// 		unique_chunk_id++;
+		// 	}
+		// 	// output the mapped id instead of the chunk itself
+		// 	remapped_name.push_back(dictionary[chunk]);
+		// 	left = read_name.find_first_not_of(delimiter, right + 1);
+		// 	right = read_name.find_first_of(delimiter, left + 1);
+		// }
+		// writeName2(remapped_name, out_buffers.ids_buf);
 	}
+	// TODO: write out the dictionary
 
 	// TODO: can only initialize parameters w/in constructors?
 	// QualityCompressor qual_compressor;
