@@ -121,7 +121,6 @@ size_t total_edits(string & fname) {
 			}
 		}
 	}
-	
 	return edit_cnt;
 }
 
