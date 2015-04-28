@@ -91,7 +91,9 @@ size_t total_edits(string & fname) {
 	size_t edit_cnt = 0;
 
 	int return_value = 0;
+	// size_t alignments = 0;
 	while ( (return_value = edits.next() ) != END_OF_STREAM) { // advance to the next alignment)
+		// alignments++;
 		if (edits.hasEdits() ) {
 			vector<uint8_t> edit_ops = edits.getEdits();
 			for (int i = 0; i < edit_ops.size(); i++) {
@@ -121,7 +123,7 @@ size_t total_edits(string & fname) {
 			}
 		}
 	}
-	
+	// cerr << "saw " << alignments << " alignments" << endl;
 	return edit_cnt;
 }
 
