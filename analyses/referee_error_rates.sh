@@ -1,4 +1,5 @@
-BIN=bin/referee_io_plzip
+cd ..
+BIN=bin/referee
 ./so_plzip.sh
 make clean
 make
@@ -44,3 +45,4 @@ done
 echo "Aggregated unique_seq_only sizes"
 python python/parse_compr_rates_error_rate.py $OUTPUT
 
+cd analyses
