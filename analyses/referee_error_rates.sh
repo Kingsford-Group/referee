@@ -1,8 +1,7 @@
-cd ..
-BIN=bin/referee
+BIN=bin/rsupport
 ./so_plzip.sh
 make clean
-make
+make rsupport
 
 if [ ! -e $BIN ]
 	then
@@ -29,12 +28,27 @@ do
 		INPUT=$DATADIR/$FILE\_all.z=$Z.sam
 		echo "-----------------"
 		echo "Processing $INPUT"
-		ls -l $INPUT
-		/usr/bin/time $TIMEOPT $BIN -c $INPUT 10 --seq2 > $INPUT.referee.seq2.log 2>&1
+
+		if [ ! -e $INPUT.edits ]
+			then
+			if [ -e $INPUT.edits.lz ]
+			then
+				plzip -fd -n 10 $INPUT.edits.lz
+			else
+				echo "No edits for $INPUT"
+				continue
+			fi
+		fi
+
 		echo "*** $FILE z=$Z" >> $OUTPUT
+		EDITS=`$BIN edits $INPUT 1 2>&1 | awk -F":" '{print $2}'`
+		echo $EDITS
+		echo "edits: $EDITS" >> $OUTPUT
 	        du -b $INPUT.offs.lz >> $OUTPUT
 	        du -b $INPUT.left_clip.lz >> $OUTPUT
 	        du -b $INPUT.right_clip.lz >> $OUTPUT
+		# compress -- because most likely we uncompressed it for above
+		plzip -v -n 10 $INPUT.edits
 	        du -b $INPUT.edits.lz >> $OUTPUT
 		# du -b $INPUT.has_edits >> $OUTPUT
 		plzip -n 10 $INPUT.has_edits
@@ -45,4 +59,3 @@ done
 echo "Aggregated unique_seq_only sizes"
 python python/parse_compr_rates_error_rate.py $OUTPUT
 
-cd analyses

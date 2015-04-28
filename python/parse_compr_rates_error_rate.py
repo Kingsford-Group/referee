@@ -47,10 +47,14 @@ with open(sys.argv[1], "r") as f:
 			# get a number of aligned reads from the log
 			reads, edits = readLogForReadCount(fname, z)
 			D[fname][z]["N"] = reads
-			D[fname][z]["edits"] = edits 
+			# D[fname][z]["edits"] = edits 
 			# print D[fname][z]
 
 		# elif "offs.lz" in line:
+		elif "edits" in line:
+			_, e = line.strip().split()
+			e = int(e)
+			D[fname][z]["edits"] = e
 		elif ".lz" in line:
 			size, f = line.strip().split()
 			D[fname][z]["bytes"] += int(size)
