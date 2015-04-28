@@ -16,7 +16,7 @@ public:
 	}
 
 	~MergedEditsStream() {
-		cerr << "Observed " << alignment_index << " alignments, of them " << have_edits << " had edits" << endl;
+		// cerr << "Observed " << alignment_index << " alignments, of them " << have_edits << " had edits" << endl;
 		// assert(alignment_index == alignments_expected);
 	}
 

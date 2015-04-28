@@ -66,9 +66,9 @@ double depth(string & fname, size_t & genome_len, int const read_len) {
 
 	cerr << "huh? " << huh << endl;
 
-	uint32_t sum = accumulate(covered_bases.begin(), covered_bases.end(), (uint32_t)0);
-	uint32_t nz = accumulate(covered_bases.begin(), covered_bases.end(), (uint32_t)0, 
-		[](uint32_t & partial_sum, uint32_t & base){
+	size_t sum = accumulate(covered_bases.begin(), covered_bases.end(), (size_t)0);
+	size_t nz = accumulate(covered_bases.begin(), covered_bases.end(), (size_t)0,
+		[](size_t & partial_sum, uint32_t & base){
 			if (base > 0) {
 				partial_sum++;
 			}
