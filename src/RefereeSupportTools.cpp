@@ -6,12 +6,14 @@
 #include <cassert>
 
 #include "decompress/OffsetsStream.hpp"
+#include "decompress/MergedEditsStream.hpp"
 
 using namespace std;
 
 ////////////////////////////////////////////////
 // does not account for splicing events
 // are clipped regions part of the coverage?
+// todo: can implement w/o keeping the whole array around
 ////////////////////////////////////////////////
 double depth(string & fname, size_t & genome_len, int const read_len) {
 	// initialize vector long enough for a bacterial genome
@@ -79,15 +81,47 @@ double depth(string & fname, size_t & genome_len, int const read_len) {
 }
 
 ////////////////////////////////////////////////
-int total_edits(string & fname) {
-	string full_name = fname + ".edits.lz";
-	ifstream edits_in(full_name);
-	if (!edits_in) {
-		cerr << "[ERROR] Could not open file. Terminating. " << full_name << endl;
-		exit(1);
+//
+// 
+//
+////////////////////////////////////////////////
+size_t total_edits(string & fname) {
+	uint8_t readlen;
+	MergedEditsStream edits(fname, readlen);
+	size_t edit_cnt = 0;
+
+	int return_value = 0;
+	while ( (return_value = edits.next() ) != END_OF_STREAM) { // advance to the next alignment)
+		if (edits.hasEdits() ) {
+			vector<uint8_t> edit_ops = edits.getEdits();
+			for (int i = 0; i < edit_ops.size(); i++) {
+				switch (edit_ops[i]) {
+					case 'L':
+					case 'R':
+						// do nothing
+					break;
+					case 'E':
+						i+=3;
+					break;
+					case 197:
+						i += 4;
+					break;
+					case 'l':
+					case 'r':
+					case 'D':
+					case 'V':
+					case 'W':
+					case 'X':
+					case 'Y':
+					case 'Z':
+						i++;
+					break;
+				}
+				edit_cnt++;
+			}
+		}
 	}
-	int edit_cnt = 0;
-	edits_in.close();
+	
 	return edit_cnt;
 }
 
@@ -113,6 +147,7 @@ int main(int argc, char * argv []) {
     }
     else if (task.compare("edits") == 0) {
     	// compute the total number of edits (clips, mm, indels, splices)
-    	total_edits(fname);
+    	size_t edit_cnt = total_edits(fname);
+    	cerr << "Total edits: " << edit_cnt << endl;
     }
 }
