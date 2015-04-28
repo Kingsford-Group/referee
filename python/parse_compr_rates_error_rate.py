@@ -51,7 +51,7 @@ with open(sys.argv[1], "r") as f:
 			# print D[fname][z]
 
 		# elif "offs.lz" in line:
-		elif "edits" in line:
+		elif "edits:" in line:
 			_, e = line.strip().split()
 			e = int(e)
 			D[fname][z]["edits"] = e
@@ -82,3 +82,4 @@ for f, d in D.iteritems():
 	# print f, " ".join( map(str, [ d[ zs[i] ] for i in xrange(len(zs)) ]) )
 	print f, " ".join( map(str, [ round( btbs[zs[i]], 2) if zs[i] in btbs else "--" for i in xrange(len(zs)) ]) )
 	print f, "edits:", " ".join( map(str, [ round( btbs_edits[zs[i]], 2) if zs[i] in btbs_edits else "--" for i in xrange( len(zs) ) ] ) )
+	print f, "seqsize:", " ".join( map(str, [ round(d[zs[i]]["bytes"] /1024.0/1024, 2) for i in xrange(len(zs))] ) )

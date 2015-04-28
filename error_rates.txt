@@ -1,0 +1,70 @@
+*** SRR445718 z=0.9
+edits:  34785271
+6331745	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.9.sam.offs.lz
+1451011	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.9.sam.left_clip.lz
+1264705	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.9.sam.right_clip.lz
+26318380	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.9.sam.edits.lz
+2198192	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.9.sam.has_edits.lz
+*** SRR445718 z=0.8
+edits:  56003249
+6800710	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.8.sam.offs.lz
+3035148	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.8.sam.left_clip.lz
+2749576	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.8.sam.right_clip.lz
+39124651	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.8.sam.edits.lz
+2405216	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.8.sam.has_edits.lz
+*** SRR445718 z=0.7
+edits:  67042291
+7027560	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.7.sam.offs.lz
+4721064	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.7.sam.left_clip.lz
+4399523	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.7.sam.right_clip.lz
+44880817	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.7.sam.edits.lz
+2479170	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.7.sam.has_edits.lz
+*** SRR445718 z=0.6
+edits:  74579197
+7207540	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.6.sam.offs.lz
+6837319	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.6.sam.left_clip.lz
+6516897	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.6.sam.right_clip.lz
+48456466	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.6.sam.edits.lz
+2525713	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.6.sam.has_edits.lz
+*** SRR445718 z=0.5
+edits:  84509888
+7335716 /mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.5.sam.offs.lz
+9228872	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.5.sam.left_clip.lz
+8803990	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.5.sam.right_clip.lz
+51441106	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.5.sam.edits.lz
+2562451	/mnt/scratch0/dfilippo/aligned/SRR445718_all.z=0.5.sam.has_edits.lz
+*** SRR1294122 z=0.9
+edits:  45017990
+11003684	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.9.sam.offs.lz
+1741354	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.9.sam.left_clip.lz
+1665459	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.9.sam.right_clip.lz
+32157043	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.9.sam.edits.lz
+3166755	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.9.sam.has_edits.lz
+*** SRR1294122 z=0.8
+edits:  59278885
+11365400	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.8.sam.offs.lz
+2766781	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.8.sam.left_clip.lz
+2641923	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.8.sam.right_clip.lz
+42143016	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.8.sam.edits.lz
+3315793	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.8.sam.has_edits.lz
+*** SRR1294122 z=0.7
+edits:  65797337
+11488077	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.7.sam.offs.lz
+3620692	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.7.sam.left_clip.lz
+3484582	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.7.sam.right_clip.lz
+46153176	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.7.sam.edits.lz
+3362081	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.7.sam.has_edits.lz
+*** SRR1294122 z=0.6
+edits:  70128607
+11579295	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.6.sam.offs.lz
+4731122	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.6.sam.left_clip.lz
+4587237	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.6.sam.right_clip.lz
+48714518	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.6.sam.edits.lz
+3392320	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.6.sam.has_edits.lz
+*** SRR1294122 z=0.5
+edits:  74052100
+6034441	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.5.sam.left_clip.lz
+5879020	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.5.sam.right_clip.lz
+11565560        /mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.5.sam.offs.lz
+50935222	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.5.sam.edits.lz
+3418199	/mnt/scratch0/dfilippo/aligned/SRR1294122_all.z=0.5.sam.has_edits.lz
