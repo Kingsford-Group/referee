@@ -58,7 +58,7 @@ Output_args initializeOutputStreams(string & name_prefix, bool aligned_seq_only,
 		oa.ids_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".ids.lz").c_str(), 3 << 20,  12 ) );
 		oa.opt_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".opt.lz").c_str() ) );
 		// oa.quals_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".quals.lz").c_str() ) );
-		oa.quals_buf = shared_ptr<QualityCompressor>(new QualityCompressor(courier, name_prefix.c_str(), 0.02, 200000, 4 ) );
+		oa.quals_buf = shared_ptr<QualityCompressor>(new QualityCompressor(courier, name_prefix.c_str(), 0.05, 200000, 4 ) );
 	}
 	oa.unaligned_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".unaligned.lz").c_str() ) );
 	

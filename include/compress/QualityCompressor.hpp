@@ -167,7 +167,7 @@ private:
 
 	Packet_courier * courier;
 
-	float percent_abundance = 0.26;
+	float percent_abundance = 0.3;
 
 	int observed_vectors = 0;
 
@@ -175,7 +175,7 @@ private:
 
 	int K_c = 3;
 
-	int generic_pile_id = 0;	
+	int generic_pile_id = 0;
 
 	vector<int> cluster_membership;
 
@@ -223,7 +223,7 @@ private:
 						" (" << (id - others->size() ) << "|" << others->size() << ") ";
 				}
 				else {
-					// store into the sh*tpile
+					// store into the generic pile
 					others->add(q_v, id);
 					cluster_membership.push_back(generic_pile_id);
 				}
@@ -240,10 +240,12 @@ private:
 	void write(string & q_v, string & prefix, string & suffix,shared_ptr<QualityCluster> clust) {
 		auto cig = to_cigar(q_v);
 		clust->writeCore( cig );
-		cig = to_cigar(prefix);
-		clust->writePrefix(cig);
-		cig = to_cigar(suffix);
-		clust->writeSuffix(cig);
+		//cig = to_cigar(prefix);
+		//clust->writePrefix(cig);
+		clust->writePrefix(prefix);
+		//cig = to_cigar(suffix);
+		//clust->writeSuffix(cig);
+		clust->writeSuffix(suffix);
 	}
 
 	void writeToCluster(string & q_v, int q_v_len, int id) {
@@ -307,14 +309,14 @@ private:
 			}
 		}
 		// merge vectors in the clusters that were too small into a sh*tpile
-		
+
 		while (remove.size() > 0) {
 			int idx = remove.back();
 			remove.pop_back();
 			clusters.erase(clusters.begin() + idx);
 		}
 		cerr << "Clusters remaining: " << (clusters.size() + 1) << endl;
-		cerr << "Quality vectors in sh*t pile: " << others->size() << 
+		cerr << "Quality vectors in generic pile: " << others->size() << 
 			" (" << (float)others->size() / observed_vectors * 100 << "%)" << endl;
 
 		// write out clusters, empty their containers, keep references to the output buffers around

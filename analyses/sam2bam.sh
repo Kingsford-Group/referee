@@ -1,8 +1,8 @@
 #FILE=ERR005143_1.bam
 #time samtools view -h $FILE -o $FILE.sam
-DIR=/data/referee/aligned
+DIR=/mnt/scratch0/dfilippo/aligned
 # for FILE in SRR1294122 SRR445718 # MiSeq_Ecoli_DH10B_110721_PF # SRR1294122 # SRR445718 # K562_cytosol_LID8465_TopHat_v2 NA12878_S1
-for FILE in NA12878_S1 # MiSeq_Ecoli_DH10B_110721_PF # SRR1294122 # SRR445718 # K562_cytosol_LID8465_TopHat_v2 NA12878_S1
+for FILE in SRR445718 SRR1294122 # NA12878_S1 # MiSeq_Ecoli_DH10B_110721_PF # K562_cytosol_LID8465_TopHat_v2 NA12878_S1
 do
         echo '------------'
         echo $FILE

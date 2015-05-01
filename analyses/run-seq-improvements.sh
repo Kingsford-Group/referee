@@ -1,4 +1,4 @@
-SETUP="0"
+SETUP="1"
 
 if [ $SETUP -eq 1 ]
 then
@@ -11,7 +11,8 @@ then
 	# HUMAN_GENOME1=/mnt/scratch0/dfilippo/genomes/human/hg19/human_genome.fa
 	HUMAN_GENOME1=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
 	# "P_aeruginosa_PAO1" $AERUG_GENOME
-	samfiles=("SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2" "MiSeq_Ecoli_DH10B_110721_PF")
+	# samfiles=("SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2" "MiSeq_Ecoli_DH10B_110721_PF")
+	samfiles=("SRR1294122" "SRR445718")
 	genomes=($HUMAN_GENOME1 $HUMAN_GENOME1 $HUMAN_GENOME1 $ECOLI_GENOME)
 	TIME="-v"
 else
@@ -38,7 +39,7 @@ do
     echo "----------------"
     echo " Processing $DIR/$FILE.sam, log at $DIR/$FILE.comp.log"
     echo " Genome: $GENOME"
-    
+
     if [ ! -e $DIR/$FILE.sam ]
         then
         echo "File does not exist!"
@@ -55,7 +56,7 @@ do
     if [ ! -e $STRIPPED.sam ]
         then
         echo " stripping file..."
-        time ./strip-fields-from-sam.sh $SRC > $STRIPPED.sam
+        time analyses/strip-fields-from-sam.sh $SRC > $STRIPPED.sam
     fi
     # wc -l $DIR/$FILE.stripped.sam
 

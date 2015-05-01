@@ -32,6 +32,10 @@ public:
 		}
 	}
 
+	~QualityCluster() {
+		cerr << "Cluster " << cluster_id << ": " << total_vectors << " vectors" << endl;
+	}
+
 	shared_ptr<unordered_map<string,int>> getProfileKmers() {return profile_kmers;} 
 
 	int getProfileSize() {return profile.size(); }
@@ -44,6 +48,7 @@ public:
 
 	// add string's core, pref, suffix
 	void add(string & q_v, int id, string & prefix, string & suffix) {
+		total_vectors++;
 		data.push_back(q_v);
 		ids.push_back(id);
 		prefices.push_back(prefix);
@@ -52,12 +57,14 @@ public:
 
 	// add string as is, w/o breaking it into core, pref and suff
 	void add(string & q_v, int id) {
+		total_vectors++;
 		data.push_back(q_v);
 		ids.push_back(id);
 	}
 
 	////////////////////////////////////////////////////////////////
 	void writeCore(string & core) {
+		total_vectors++;
 		writeString(core, output_str);
 	}
 
@@ -155,6 +162,7 @@ private:
 	Packet_courier * courier;
 	bool is_pile = false;
 	int cluster_id = -1;
+	size_t total_vectors = 0;
 	string profile;
 	shared_ptr<unordered_map<string, int>> profile_kmers;
 	vector<string> data;

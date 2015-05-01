@@ -94,7 +94,7 @@ public:
 
 private:
 
-	uint32_t total_bytes = 0;
+	int64_t total_bytes = 0;
 
 	// vector<uint8_t> data;
 	deque<uint8_t> data;
