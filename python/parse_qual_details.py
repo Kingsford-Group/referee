@@ -28,8 +28,15 @@ with open(sys.argv[1], "r") as f:
 			for s in fd_sizes:
 				parts = s.strip().split()
 				if len(parts) == 1: continue
+				if "Cluster " in s:
+					vectors = int(s.split()[2])
+					continue
 				fd = int(parts[1].strip(",").strip("Closing fd=") )
-				bytes = int(parts[3])
+				if "k=" in fd_full[fd]:
+					bytes = vectors * read_len
+				else:
+					bytes = int(parts[3])
+				
 				if os.path.isfile(fd_full[fd]):
 					comp_bytes = os.path.getsize(fd_full[fd])
 				else:
@@ -46,7 +53,8 @@ with open(sys.argv[1], "r") as f:
 						comp_clusters_total += comp_bytes				
 					else:
 						other_bytes = bytes
-					print fd_map[fd], comp_bytes, bytes, ratio
+					if not "ix" in fd_map[fd]:
+						print fd_map[fd], comp_bytes, bytes, ratio
 # add membership vector
 full_path = fd_full[12]
 parts = full_path.split("/")
