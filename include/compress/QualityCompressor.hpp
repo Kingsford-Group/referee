@@ -57,8 +57,22 @@ string trim_ends_s(string & q_v, char mode, string & prefix, string & suffix) {
 			break;
 		}
 	}
-	prefix = q_v.substr(0, i);
-	suffix = q_v.substr(j);
+	if (i < 8) {
+		// do not cut prefix
+		prefix = "";
+		i = 0;
+	}
+	else {
+		prefix = q_v.substr(0, i);
+	}
+	if (q_v.size() - j < 8) {
+		// do not cut suffix
+		suffix = "";
+		j = string::npos;
+	}
+	else {
+		suffix = q_v.substr(j);
+	}
 	return q_v.substr(i, j-i);
 }
 
