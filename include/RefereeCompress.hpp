@@ -12,6 +12,7 @@
 struct Parser_args {
 	Output_args output;
 	string file_name;
+	string ref_file_name;
 	int num_parsing_threads;
 	Packet_courier * courier;
 	bool aligned_seq_only;
@@ -26,7 +27,7 @@ void * parseSAM( void * pa) {
 	Packet_courier * courier = tmp.courier;
 	Output_args outs = tmp.output;
 	// will write out a BAM/SAM header
-	Compressor c(tmp.file_name, tmp.num_parsing_threads, outs, tmp.aligned_seq_only, tmp.unique_seq_only);
+	Compressor c(tmp.file_name, tmp.ref_file_name, tmp.num_parsing_threads, outs, tmp.aligned_seq_only, tmp.unique_seq_only);
 	if (c.failed() ) {
 		cerr << "[INFO] Terminating. " << endl;
 		courier->finish();
@@ -66,7 +67,7 @@ Output_args initializeOutputStreams(string & name_prefix, bool aligned_seq_only,
 };
 
 ////////////////////////////////////////////////////////////////
-void compressFile(string & file_name, const int num_workers, bool aligned_seq_only, bool unique_seq_only) {
+void compressFile(string & file_name, string const & ref_file_name, const int num_workers, bool aligned_seq_only, bool unique_seq_only) {
 	int dictionary_size = 1<<23;
 	int match_len_limit = 36; // equivalent to -6 option
 
@@ -85,6 +86,7 @@ void compressFile(string & file_name, const int num_workers, bool aligned_seq_on
 	Parser_args parser_args;
 	parser_args.output = output_args;
 	parser_args.file_name = file_name;
+	parser_args.ref_file_name = ref_file_name;
 	parser_args.courier = &courier;
 	parser_args.aligned_seq_only = aligned_seq_only;
 	parser_args.unique_seq_only = unique_seq_only;

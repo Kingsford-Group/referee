@@ -5,7 +5,6 @@
 #include <memory>
 
 #include "InputBuffer.hpp"
-#include "TransUtils.hpp"
 
 class EditsStream {
 public:

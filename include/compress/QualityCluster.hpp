@@ -33,7 +33,7 @@ public:
 	}
 
 	~QualityCluster() {
-		cerr << "Cluster " << cluster_id << ": " << total_vectors << " vectors" << endl;
+		// cerr << "Cluster " << cluster_id << ": " << total_vectors << " vectors" << endl;
 	}
 
 	shared_ptr<unordered_map<string,int>> getProfileKmers() {return profile_kmers;} 

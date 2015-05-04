@@ -57,7 +57,7 @@ public:
 		// MergedEditsStream edits(file_name, read_len);
 		read_len = edits.getReadLen();
 		cerr << "Read length:\t" << (int)read_len << endl;
-		TranscriptsStream transcripts(file_name, ref_path);
+		TranscriptsStream transcripts(file_name, ref_path, "-d");
 		recovered_file.open( output_name.c_str() );
 		// TODO: check if opened successfully
 
@@ -88,10 +88,10 @@ public:
 				if (edits.hasEdits() ) {
 					// extract edits
 					vector<uint8_t> edit_ops = edits.getEdits();
-					reconstructRead(offset, read_len, ref_id, transcripts, edit_ops, left_clips, right_clips); // TODO: add right and left clips
+					reconstructAlignment(offset, read_len, ref_id, transcripts, edit_ops, left_clips, right_clips); // TODO: add right and left clips
 				}
 				else {
-					reconstructRead(offset, ref_id, transcripts);
+					reconstructAlignment(offset, ref_id, transcripts);
 				}
 			}
 			i++;
@@ -100,6 +100,7 @@ public:
 				cerr << i / 1000000 << "mln ";
 			}
 		}
+		cerr << endl;
 		recovered_file.close();
 	}
 
@@ -124,32 +125,51 @@ private:
 	// reconstructs read without edits
 	// TODO: fill out a iolib staden BAM record and write to a bam format
 	////////////////////////////////////////////////////////////////
-	void reconstructRead(int offset, int ref_id, TranscriptsStream & transcripts) {
-		// SAM files use 1-based offsets
+	void reconstructAlignment(int offset, int ref_id, TranscriptsStream & transcripts) {
+		// TODO
+		// recovered_file << read_id << "\t" << flags << "\t";
+		
+		// write out reference name, offset (SAM files use 1-based offsets)
 		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1);
-		string read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
-		std::transform(read.begin(), read.end(), read.begin(), ::toupper);
-		// CIGAR string is all matches
-		recovered_file << "\t" << (int)read_len << "M";
-		// recovered_file << "\t" << read; /*<< /*"\tMD:Z:" << (int)read_len;*/
+		// // get read sequence
+		// string read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
+		// // to upper case
+		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
+		// // write out CIGAR string -- all matches
+		// recovered_file << "\t" << (int)read_len << "M";
+		// // TODO: write out columns with quality mapping, PNEXT, ...
+		// recovered_file << "\t" << read; 
+		// // TODO: write out qual vector
+		// // recovered_file << qual;
+		// // skip MD -- read has no edits
 		recovered_file << endl;
 	}
 
 	////////////////////////////////////////////////////////////////
 	// reconstructs a read that had edits
 	////////////////////////////////////////////////////////////////
-	void reconstructRead(int offset, int read_len, int ref_id, TranscriptsStream & transcripts, vector<uint8_t> & edits, 
+	void reconstructAlignment(int offset, int read_len, int ref_id, 
+			TranscriptsStream & transcripts, 
+			vector<uint8_t> & edits, 
 			ClipStream & left_clips,
 			ClipStream & right_clips) {
-		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) ;
 		// TODO
-		// int left_clip_len = 0, right_clip_len = 0;
-		// string read = getTranscriptSequence(ref_id, offset + left_clip_len, read_len - left_clip_len - right_clip_len);
-		string cigar, md_string = "MD:Z:";
-		string read = buildEditStrings(read_len, edits, cigar, md_string, left_clips, right_clips, offset, ref_id, transcripts);
-		std::transform(read.begin(), read.end(), read.begin(), ::toupper);
-		recovered_file << "\t" << cigar;
-		// recovered_file << "\t" << read << /*"\t" << md_string <<*/ endl;
+		// recovered_file << read_id << "\t" << flags << "\t";
+		// write out reference name, offset (1-based in SAMs)
+		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) ;
+		// // TODO
+		// // int left_clip_len = 0, right_clip_len = 0;
+		// // string read = getTranscriptSequence(ref_id, offset + left_clip_len, read_len - left_clip_len - right_clip_len);
+		// string cigar, md_string = "MD:Z:";
+		// string read = buildEditStrings(read_len, edits, cigar, md_string, left_clips, right_clips, offset, ref_id, transcripts);
+		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
+		// recovered_file << "\t" << cigar;
+		// // TODO: write out mapq, PNEXT, ....
+		// // write out the read sequence
+		// recovered_file << "\t" << read;
+		// // TODO: write out qual vector
+		// // recovered_file << "\t" << qual;
+		// recovered_file << "\t" << md_string;
 		recovered_file << endl;
 	}
 

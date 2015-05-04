@@ -6,34 +6,100 @@ maintains OutputBuffers for the clusters
 #ifndef QUALITY_COMP_H
 #define QUALITY_COMP_H
 
+#include <chrono>
 
 #include "QualityCluster.hpp"
 
 ////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////
+
+unordered_map<string, int> countKmers(string const & q_v, int const K) {
+	unordered_map<string, int> kmers;
+	for (int i = 0; i < q_v.size() - K + 1; i++) {
+		auto kmer = q_v.substr(i, K);
+		if (kmers.find(kmer) == kmers.end() )
+			kmers[kmer] = 0;
+		kmers[kmer]++;
+	}
+	return kmers;
+}
+
+chrono::duration<double> elapsed_seconds_d2_loop1;
+chrono::duration<double> elapsed_seconds_d2_loop2;
+chrono::duration<double> elapsed_seconds_d2_loop3;
 float d2(shared_ptr<unordered_map<string, int>> profile_kmers, float const f1, string & q, int const K) {
+	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
+	// a map of pairs containing the counts
 	unordered_map<string, pair<int,int>> counts;
+	// number of kmers in the new string
 	float f2 = q.size() - K + 1;
+	// go through kmer in the profile and update counts
 	for (auto p : *profile_kmers) {
 		auto kmer = p.first;
 		if (counts.find(p.first) == counts.end()) 
 			counts[kmer] = make_pair(0,0);
 		counts[kmer].first = p.second;
 	}
+	chrono::time_point<chrono::system_clock> end = chrono::system_clock::now();
+	elapsed_seconds_d2_loop1 += (end - start);
+
+	start = chrono::system_clock::now();
+	// go through kmers in the new string and count kmers
 	for (int i = 0; i < q.size() - K + 1; i++) {
 		auto kmer = q.substr(i, K);
 		if (counts.find(kmer) == counts.end()) 
 			counts[kmer] = make_pair(0,0);
 		counts[kmer].second++;
 	}
+	end = chrono::system_clock::now();
+	elapsed_seconds_d2_loop2 += (end - start);
+
+	
+	
 	// compare kmer profiles
+	start = chrono::system_clock::now();
 	float d2_ = 0;
-	for (auto kmer_c : counts) {
-		auto c_p = kmer_c.second;
-		auto delta = (c_p.first/f1 - c_p.second/f2);
+	for (auto kmer_p : counts) {
+		pair<int,int> kmer_counts = kmer_p.second;
+		float delta = (kmer_counts.first/f1 - kmer_counts.second/f2);
 		d2_ += delta * delta;
 	}
+	end = chrono::system_clock::now();
+	elapsed_seconds_d2_loop3 += (end - start);
+	return d2_;
+}
+
+
+
+float d2_fast(shared_ptr<unordered_map<string, int>> profile_kmers, float const f1, 
+	unordered_map<string,int> const & counts, float const f2) {
+	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
+	// compare kmer profiles
+	float d2_ = 0;
+	// all things in cluster profile, but not in this string AND things shared
+	for (auto p : *profile_kmers) {
+		auto it = counts.find(p.first);
+		if (it == counts.end() )
+			d2_ += (p.second / f1) * (p.second / f1);
+		else {
+			float delta = p.second / f1 - (*it).second / f2;
+			d2_ += delta * delta;
+		}
+	}
+	chrono::time_point<std::chrono::system_clock> end = chrono::system_clock::now();
+	elapsed_seconds_d2_loop2 += (end - start);
+
+	// counts all things in this string, but not in cluster profile
+	start = chrono::system_clock::now();
+	for (auto p : counts) {
+		if (profile_kmers->find(p.first) == profile_kmers->end()) {
+			d2_ += p.second / f2 * p.second/f2;
+		}
+		// else -- already counted above
+	}
+	end = chrono::system_clock::now();
+	elapsed_seconds_d2_loop3 += (end - start);
 	return d2_;
 }
 
@@ -151,6 +217,9 @@ public:
 		ofstream cluster_out(fname + ".k=" + to_string(K_c) + ".membership" );
 		for (auto m : cluster_membership) cluster_out << m << " ";
 		cluster_out.close();
+
+		cerr << "Total times in d2 loops: " << elapsed_seconds_d2_loop1.count() << "," <<
+			elapsed_seconds_d2_loop2.count() << "," << elapsed_seconds_d2_loop3.count() << "sec" << endl;
 	}
 
 	///////////////////////////////////////////////////////////
@@ -160,8 +229,13 @@ public:
 		for (auto i = 0; i < len; i++) s += qual_read[i] + '!';
 		if (observed_vectors <= bootstrap_size) {
 			assignQualityVector(s, len, observed_vectors, true);
-			if (observed_vectors == bootstrap_size)
+			if (observed_vectors == bootstrap_size) {
+				cerr << "Time in d2: loop1 " << elapsed_seconds_d2_loop1.count() << "s" << endl;
+				cerr << "Time in d2: loop2 " << elapsed_seconds_d2_loop2.count() << "s" << endl;
+				cerr << "Time in d2: loop3 " << elapsed_seconds_d2_loop3.count() << "s" << endl;
+				// exit(1);
 				refineClusters();
+			}
 		}
 		else {
 			// have fixed clusters -- assign read to one of the existing clusters, output
@@ -215,10 +289,12 @@ private:
 		else {
 			string prefix, suffix;
 			q_v = trim_ends_s(q_v, m, prefix, suffix);
+			unordered_map<string,int> q_kmers = countKmers(q_v, K_c);
+			float f2 = q_v.size() - K_c + 1;
 			// try to assign to an existing cluster
 			bool found = false;
 			for (auto clust : clusters) {
-				float d = d2(clust->getProfileKmers(), clust->getProfileSize() - K_c + 1, q_v, K_c);
+				float d = d2_fast(clust->getProfileKmers(), clust->getProfileSize() - K_c + 1.0, q_kmers, f2);
 				if (d < 0.05) {
 					found = true;
 					clust->add(q_v, id, prefix, suffix);
@@ -274,10 +350,12 @@ private:
 		else {
 			string prefix, suffix;
 			q_v = trim_ends_s(q_v, m, prefix, suffix);
+			auto q_kmers = countKmers(q_v, K_c);
+			float f2 = q_v.size() - K_c + 1;
 			// try to assign to an existing cluster
 			bool found = false;
 			for (auto clust : clusters) {
-				float d = d2(clust->getProfileKmers(), clust->getProfileSize() - K_c + 1.0f, q_v, K_c);
+				float d = d2_fast(clust->getProfileKmers(), clust->getProfileSize() - K_c + 1.0f, q_kmers, f2);
 				if (d < 0.05) {
 					write(q_v, prefix, suffix, clust);
 					cluster_membership.push_back(clust->getClusterID());

@@ -11,6 +11,7 @@
 #include <stdlib.h>
 
 #include "RefereeUtils.hpp"
+#include "TranscriptsStream.hpp"
 
 using namespace std;
 
@@ -233,9 +234,9 @@ public:
 	////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
-	bool handleEdits() {
+	bool handleEdits(TranscriptsStream & ts) {
 		auto cigarEdits = handleCigar(); // return smth?
-	    auto mdEdits = handleMDstring();
+	    auto mdEdits = handleMDstring(ts);
 	    if (rejected) return cigarEdits || mdEdits;
 	    // cerr << auxillary_fields << endl;
 	    if (cigarEdits || mdEdits )
@@ -371,16 +372,39 @@ private:
     ////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
-	bool handleMDstring() {
+	bool handleMDstring(TranscriptsStream & ts) {
 		bool hasEdits = false;
 		auto auxillary_fields = bam_aux(read);
 		auto md = bam_aux_find(read, "MD");
 		if (md != NULL) {
 			md++; // skip 'Z' -- indicator of the printable string
 			parseMD(md);
-			hasEdits = md_edits.size() > 0;
 		}
+		else {
+			// check for mismatches
+			md_edits = getMismatches(ts, cigar_edits);
+		}
+		hasEdits = md_edits.size() > 0;
 		return hasEdits;
+	}
+
+	////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////
+	vector<edit_pair> getMismatches(TranscriptsStream & ts, vector<edit_pair> & cigar_edits) {
+		vector<edit_pair> md_edits;
+		vector<uint8_t> read_seq = this->getSeq();
+		string ref_seq = ts.getTranscriptSequence(this->ref(), this->offset(), read_seq.size());
+		for (int i = 0; i < read_seq.size(); i++) {
+			if (read_seq[i] != ref_seq[i]) {
+				// mismatch -- record the letter that appear in the read at position i
+				md_edits.push_back( edit_pair(read_seq[i], i) ); 
+			}
+		}
+		// TODO: handle clipped regions
+		// TODO: handle splicing events in the cigar
+		// TODO: handle indels in the cigar
+		return md_edits;
 	}
 
 	////////////////////////////////////////////////////////////////
