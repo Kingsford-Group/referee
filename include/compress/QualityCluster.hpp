@@ -4,11 +4,40 @@
 #include <memory>
 #include <fstream>
 #include <string>
+#include <chrono>
 
 #include <compress.h>
 #include "OutputBuffer.hpp"
 
 using namespace std;
+
+
+////////////////////////////////////////////////////////////////
+// convert kmer from base 89 ('z' - '!') to base 10
+////////////////////////////////////////////////////////////////
+chrono::duration<double> elapsed_seconds_d2_loop1;
+int range = 'z' - '!' + 1;
+// only for 4-mers
+// 5mers would require int64_t
+int r_base[] = {range*range*range, range*range, range, 1};
+
+unordered_map<int, int> countKmers(string const & q_v, int const K) {
+	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
+	unordered_map<int, int> kmers;
+	for (int i = 0; i < q_v.size() - K + 1; i++) {
+		int kmer_int = 0;
+		for (int j = 0; j < K; j++) {
+			kmer_int += (q_v[i + j] - '!') * r_base[j];
+		}
+		if (kmers.find(kmer_int) == kmers.end() )
+			kmers[kmer_int] = 0;
+		kmers[kmer_int]++;
+	}
+	chrono::time_point<chrono::system_clock> end = chrono::system_clock::now();
+	elapsed_seconds_d2_loop1 += (end - start);
+	return kmers;
+}
+
 
 ////////////////////////////////////////////////////////////////
 //
@@ -23,20 +52,22 @@ public:
 	QualityCluster(Packet_courier * c, string & profile, int K, bool p = false): courier(c), is_pile(p) {
 		this->profile = profile;
 		// build profile kmers
-		profile_kmers = shared_ptr<unordered_map<string,int>>(new unordered_map<string,int>() );
-		for (int i = 0; i < profile.size() - K + 1; i++) {
-			auto kmer = profile.substr(i, K);
-			if (profile_kmers->find(kmer) == profile_kmers->end()) 
-				(*profile_kmers)[kmer] = 0;
-			(*profile_kmers)[kmer]++;
-		}
+		
+		auto kmers = countKmers(profile, K);
+		profile_kmers = make_shared<unordered_map<int,int>>( kmers );
+		// for (int i = 0; i < profile.size() - K + 1; i++) {
+		// 	auto kmer = profile.substr(i, K);
+		// 	if (profile_kmers->find(kmer) == profile_kmers->end()) 
+		// 		(*profile_kmers)[kmer] = 0;
+		// 	(*profile_kmers)[kmer]++;
+		// }
 	}
 
 	~QualityCluster() {
 		// cerr << "Cluster " << cluster_id << ": " << total_vectors << " vectors" << endl;
 	}
 
-	shared_ptr<unordered_map<string,int>> getProfileKmers() {return profile_kmers;} 
+	shared_ptr<unordered_map<int,int>> getProfileKmers() {return profile_kmers;} 
 
 	int getProfileSize() {return profile.size(); }
 
@@ -119,9 +150,10 @@ public:
 					i++;
 				}
 				// insert before i-th element
-				// TODO: this is O(n), should use deque
+				// TODO: this is O(n), should use another data structure
 				// TODO: do we need to insert the IDs themselves?
-				ids.insert(ids.begin() + i, cluster->ids[j]);
+				// ids.insert(ids.begin() + i, cluster->ids[j]);
+				ids.push_back(cluster->ids[j]); // order does not matter -- it is an index
 				data.insert( data.begin() + i, cluster->prefices[j] + cluster->data[j] + cluster->suffices[j] );
 				j++;
 				i++;
@@ -164,7 +196,7 @@ private:
 	int cluster_id = -1;
 	size_t total_vectors = 0;
 	string profile;
-	shared_ptr<unordered_map<string, int>> profile_kmers;
+	shared_ptr<unordered_map<int, int>> profile_kmers;
 	vector<string> data;
 	vector<string> prefices;
 	vector<string> suffices;
