@@ -16,7 +16,7 @@ export DYLD_LIBRARY_PATH=plzip:$DYLD_LIBRARY_PATH
 
 # DATADIR=/mnt/scratch0/dfilippo/aligned
 DATADIR=/data/referee/aligned
-# FILE=SRR445718.sam
+# FILE=SRR445718.2m.sam
 # FILE=SRR445718.sam
 #FILE=SRR1294122.sam
 #DATADIR=.

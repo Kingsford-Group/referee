@@ -10,70 +10,57 @@ maintains OutputBuffers for the clusters
 
 #include "QualityCluster.hpp"
 
-////////////////////////////////////////////////////////////////
-//
-////////////////////////////////////////////////////////////////
 
-unordered_map<string, int> countKmers(string const & q_v, int const K) {
-	unordered_map<string, int> kmers;
-	for (int i = 0; i < q_v.size() - K + 1; i++) {
-		auto kmer = q_v.substr(i, K);
-		if (kmers.find(kmer) == kmers.end() )
-			kmers[kmer] = 0;
-		kmers[kmer]++;
-	}
-	return kmers;
-}
 
-chrono::duration<double> elapsed_seconds_d2_loop1;
+
 chrono::duration<double> elapsed_seconds_d2_loop2;
 chrono::duration<double> elapsed_seconds_d2_loop3;
-float d2(shared_ptr<unordered_map<string, int>> profile_kmers, float const f1, string & q, int const K) {
-	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
-	// a map of pairs containing the counts
-	unordered_map<string, pair<int,int>> counts;
-	// number of kmers in the new string
-	float f2 = q.size() - K + 1;
-	// go through kmer in the profile and update counts
-	for (auto p : *profile_kmers) {
-		auto kmer = p.first;
-		if (counts.find(p.first) == counts.end()) 
-			counts[kmer] = make_pair(0,0);
-		counts[kmer].first = p.second;
-	}
-	chrono::time_point<chrono::system_clock> end = chrono::system_clock::now();
-	elapsed_seconds_d2_loop1 += (end - start);
+// float d2(shared_ptr<unordered_map<string, int>> profile_kmers, float const f1, string & q, int const K) {
+// 	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
+// 	// a map of pairs containing the counts
+// 	unordered_map<string, pair<int,int>> counts;
+// 	// number of kmers in the new string
+// 	float f2 = q.size() - K + 1;
+// 	// go through kmer in the profile and update counts
+// 	for (auto p : *profile_kmers) {
+// 		auto kmer = p.first;
+// 		if (counts.find(p.first) == counts.end()) 
+// 			counts[kmer] = make_pair(0,0);
+// 		counts[kmer].first = p.second;
+// 	}
+// 	chrono::time_point<chrono::system_clock> end = chrono::system_clock::now();
+// 	elapsed_seconds_d2_loop1 += (end - start);
 
-	start = chrono::system_clock::now();
-	// go through kmers in the new string and count kmers
-	for (int i = 0; i < q.size() - K + 1; i++) {
-		auto kmer = q.substr(i, K);
-		if (counts.find(kmer) == counts.end()) 
-			counts[kmer] = make_pair(0,0);
-		counts[kmer].second++;
-	}
-	end = chrono::system_clock::now();
-	elapsed_seconds_d2_loop2 += (end - start);
+// 	start = chrono::system_clock::now();
+// 	// go through kmers in the new string and count kmers
+// 	for (int i = 0; i < q.size() - K + 1; i++) {
+// 		auto kmer = q.substr(i, K);
+// 		if (counts.find(kmer) == counts.end()) 
+// 			counts[kmer] = make_pair(0,0);
+// 		counts[kmer].second++;
+// 	}
+// 	end = chrono::system_clock::now();
+// 	elapsed_seconds_d2_loop2 += (end - start);
 
 	
 	
-	// compare kmer profiles
-	start = chrono::system_clock::now();
-	float d2_ = 0;
-	for (auto kmer_p : counts) {
-		pair<int,int> kmer_counts = kmer_p.second;
-		float delta = (kmer_counts.first/f1 - kmer_counts.second/f2);
-		d2_ += delta * delta;
-	}
-	end = chrono::system_clock::now();
-	elapsed_seconds_d2_loop3 += (end - start);
-	return d2_;
-}
+// 	// compare kmer profiles
+// 	start = chrono::system_clock::now();
+// 	float d2_ = 0;
+// 	for (auto kmer_p : counts) {
+// 		pair<int,int> kmer_counts = kmer_p.second;
+// 		float delta = (kmer_counts.first/f1 - kmer_counts.second/f2);
+// 		d2_ += delta * delta;
+// 	}
+// 	end = chrono::system_clock::now();
+// 	elapsed_seconds_d2_loop3 += (end - start);
+// 	return d2_;
+// }
 
 
 
-float d2_fast(shared_ptr<unordered_map<string, int>> profile_kmers, float const f1, 
-	unordered_map<string,int> const & counts, float const f2) {
+float d2_fast(shared_ptr<unordered_map<int, int>> profile_kmers, float const f1, 
+	unordered_map<int,int> const & counts, float const f2) {
 	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
 	// compare kmer profiles
 	float d2_ = 0;
@@ -107,7 +94,9 @@ float d2_fast(shared_ptr<unordered_map<string, int>> profile_kmers, float const 
 ////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////
+chrono::duration<double> elapsed_trim_ends;
 string trim_ends_s(string & q_v, char mode, string & prefix, string & suffix) {
+	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
 	int i = 0, j = q_v.size() - 1;
 	while (i < q_v.size() - 1 ) {
 		if (q_v[i] != mode && q_v[i+1] != mode) i++; // stricter
@@ -139,13 +128,17 @@ string trim_ends_s(string & q_v, char mode, string & prefix, string & suffix) {
 	else {
 		suffix = q_v.substr(j);
 	}
+	chrono::time_point<std::chrono::system_clock> end = chrono::system_clock::now();
+	elapsed_trim_ends += (end - start);
 	return q_v.substr(i, j-i);
 }
 
 ////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////
+chrono::duration<double> elapsed_mode_time;
 char weighted_mode(string & qual, int & f) {
+	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
 	// TODO: a more careful implementation: need 90 or less? space or smthing else?
 	float weights[90];
 	int frequencies[90];
@@ -168,6 +161,8 @@ char weighted_mode(string & qual, int & f) {
 		}
 	}
 	f = max_f;
+	chrono::time_point<std::chrono::system_clock> end = chrono::system_clock::now();
+	elapsed_mode_time += (end - start);
 	return max_i + ' ';
 }
 
@@ -218,8 +213,11 @@ public:
 		for (auto m : cluster_membership) cluster_out << m << " ";
 		cluster_out.close();
 
-		cerr << "Total times in d2 loops: " << elapsed_seconds_d2_loop1.count() << "," <<
+		cerr << endl << "Total times in d2 loops: " << elapsed_seconds_d2_loop1.count() << "," <<
 			elapsed_seconds_d2_loop2.count() << "," << elapsed_seconds_d2_loop3.count() << "sec" << endl;
+		cerr << "Total mode time: " << elapsed_mode_time.count() << "s" << endl;
+		cerr << "Total trimming time: " << elapsed_trim_ends.count() << "s" << endl;
+		cerr << "Total writing time: " << elapsed_writes.count() << "s" << endl;
 	}
 
 	///////////////////////////////////////////////////////////
@@ -289,7 +287,7 @@ private:
 		else {
 			string prefix, suffix;
 			q_v = trim_ends_s(q_v, m, prefix, suffix);
-			unordered_map<string,int> q_kmers = countKmers(q_v, K_c);
+			unordered_map<int,int> q_kmers = countKmers(q_v, K_c);
 			float f2 = q_v.size() - K_c + 1;
 			// try to assign to an existing cluster
 			bool found = false;
@@ -322,20 +320,27 @@ private:
 	}
 
 	// write a quality value w/o splitting it into prefix, core, suffix
+	chrono::duration<double> elapsed_writes;
 	void write(string & s, shared_ptr<QualityCluster> c) {
-		auto cig = to_cigar(s);
-		c->writeCore( cig );
+		chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
+		// auto cig = to_cigar(s);
+		c->writeCore( s );
+		chrono::time_point<std::chrono::system_clock> end = chrono::system_clock::now();
+		elapsed_writes += (end - start);
 	}
 
 	void write(string & q_v, string & prefix, string & suffix,shared_ptr<QualityCluster> clust) {
-		auto cig = to_cigar(q_v);
-		clust->writeCore( cig );
+		chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
+		// auto cig = to_cigar(q_v);
+		clust->writeCore( q_v );
 		//cig = to_cigar(prefix);
 		//clust->writePrefix(cig);
 		clust->writePrefix(prefix);
 		//cig = to_cigar(suffix);
 		//clust->writeSuffix(cig);
 		clust->writeSuffix(suffix);
+		chrono::time_point<std::chrono::system_clock> end = chrono::system_clock::now();
+		elapsed_writes += (end - start);
 	}
 
 	void writeToCluster(string & q_v, int q_v_len, int id) {
