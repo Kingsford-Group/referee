@@ -14,15 +14,16 @@ export DYLD_LIBRARY_PATH=plzip:$DYLD_LIBRARY_PATH
 
 # sudo purge -n
 
-# DATADIR=/mnt/scratch0/dfilippo/aligned
-DATADIR=/data/referee/aligned
-# FILE=SRR445718.sam
+DATADIR=/mnt/scratch0/dfilippo/aligned
+# DATADIR=/data/referee/aligned
+FILE=SRR445718.sam
 # FILE=SRR445718.sam
 #FILE=SRR1294122.sam
 #DATADIR=.
 # FILE=test.sam
-FILE=P_aeruginosa_PAO1.10mil.sam
-GENOME=NC_002516.fna
+#FILE=P_aeruginosa_PAO1.10mil.sam
+#PAERUG_GENOME=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_002516.fna
+HUMAN_GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
 #FILE=K562_cytosol_LID8465_TopHat_v2.sam
 # FILE=NA12878_S1.sorted.sam
 rm -f $DATADIR/$FILE.offs.lz
@@ -39,10 +40,10 @@ rm -f $DATADIR/$FILE.k\=*
 # HUMAN_GENOME=$DATADIR/human_genome.fa
 # HUMAN_GENOME=$DATADIR/../genomes/deez/all_chromosomes_hg_19.fa
 
-# TIMEOPT="-v"
-TIMEOPT="-lp"
+TIMEOPT="-v"
+# TIMEOPT="-lp"
 
-/usr/bin/time $TIMEOPT $BIN -c $DATADIR/$FILE -t 10 -r $DATADIR/$GENOME # > $DATADIR/$FILE.seq_comp.log 2>&1
+/usr/bin/time $TIMEOPT $BIN -c $DATADIR/$FILE -t 10 -r $HUMAN_GENOME # > $DATADIR/$FILE.seq_comp.log 2>&1
 # ls -l $DATADIR/$FILE.*
 # time plzip -vf $DATADIR/$FILE.k\=* 2> $DATADIR/$FILE.plzip
 # python python/parse_plzip_output.py $DATADIR/$FILE.plzip
@@ -57,7 +58,7 @@ TIMEOPT="-lp"
 # 	plzip -fd $DATADIR/$FILE.edits.lz
 # 	plzip -fd $DATADIR/$FILE.*clip.lz
 # 	plzip -fd $DATADIR/$FILE.has_edits.lz
-# 	/usr/bin/time $TIMEOPT $BIN -d $DATADIR/$FILE -r $DATADIR/$GENOME # > $DATADIR/$FILE.decomp.log 2>&1
+# 	/usr/bin/time $TIMEOPT $BIN -d $DATADIR/$FILE -r $PAERUG_GENOME # > $DATADIR/$FILE.decomp.log 2>&1
 # 	# only compare chr, offs, cigar strings
 # 	# diff --suppress-common-lines -i -w -y -B <(cut -f 3,4 $DATADIR/$FILE) $DATADIR/$FILE.recovered | wc -l
 # fi

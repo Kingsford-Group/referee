@@ -380,11 +380,14 @@ private:
 		cerr << "Initial clusters: " << clusters.size() << endl;
 		int clust_id = generic_pile_id + 1; // all other cluster IDs will have ids starting with 1
 		vector<int> remove;
+		cerr << "[INFO] Filtering clusters that are too small..." << endl;
 		for (auto i = 0; i < clusters.size(); i++) {
+			cerr << i << " ";
 			auto clust = clusters[i];
-			clust->setClusterID(clust_id);
 			float percent = clust->size() / (float)observed_vectors;
+			cerr << percent << " ";
 			if (percent > percent_abundance) { // one percent
+				clust->setClusterID(clust_id);
 				cerr << "Cluster " << clust_id << ": " << (percent * 100) << "% of vectors seen so far" << endl;
 				// record cluster membership for items in this cluster
 				clust->fillOutClusterMembership(cluster_membership);
@@ -393,14 +396,18 @@ private:
 			else {
 				remove.push_back(i);
 				// reassign cluster's data to the "others" pile
-				others->mergeCluster(clust);
+				cerr << "merging ";
+				// TODO: merge
+				// others->mergeCluster(clust);
 				// for (auto v : clust->data) {
 				// 	others->data.push_back(v);
 				// }
 				// cluster membership is in the sh-pile by default -- no need to update
+				cerr << "next ";
 			}
 		}
 		// merge vectors in the clusters that were too small into a sh*tpile
+		cerr << "[INFO] merging vectors from rejected clusters..." << endl;
 
 		while (remove.size() > 0) {
 			int idx = remove.back();
