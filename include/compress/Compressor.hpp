@@ -22,6 +22,7 @@
 #include "OutputBuffer.hpp"
 #include "QualityCompressor.hpp"
 #include "RefereeUtils.hpp"
+#include "TranscriptsStream.hpp"
 
 
 
@@ -67,8 +68,9 @@ public:
 	////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
-	Compressor (string const & file_name, int t, Output_args & output_buffers, bool aligned_seq_only, bool unique_seq_only):
+	Compressor (string const & file_name, string const & ref_file, int t, Output_args & output_buffers, bool aligned_seq_only, bool unique_seq_only):
 		parser(file_name, t),
+		ref_seq_handler(file_name, ref_file, "-c"),
 		out_buffers(output_buffers),
 		file_name(file_name),
 		aligned_seq_only(aligned_seq_only),
@@ -89,6 +91,7 @@ public:
 		/*SAM_hdr*/ auto* h = parser.header();
 		auto num_ref = h->nref;
 		for (auto i = 0; i < num_ref; i++) {
+			ref_seq_handler.setMapping(i, h->ref[i].name);
 			head_out << i << " " << h->ref[i].name << endl;
 		}
 		head_out.close();
@@ -113,6 +116,8 @@ public:
 	    if (unique_seq_only)
 	    	cerr << "Unique total reads: " << count << endl;
 
+	    cerr << "Total edits: " << edit_count << endl;
+
 	    outputPair(offset_pair);
 	    processHasEditsBits(edit_flags, file_name);
 	}
@@ -124,6 +129,8 @@ public:
 ////////////////////////////////////////////////////////////////
 private:
 
+	int64_t edit_count = 0;
+
 	bool failed_ = false;
 
 	bool aligned_seq_only = false; // compress all aligned sequence, including the multimaps
@@ -132,6 +139,9 @@ private:
 	// TODO: strategies for choosing the alignement: smallest errors, most consistent offsets
 
 	int count = 0;
+
+	// reference sequence
+	TranscriptsStream ref_seq_handler;
 
 	// parser
 	IOLibParser parser;
@@ -185,17 +195,14 @@ private:
 	bool handleEdits(IOLibAlignment & al) {
 		if ( !al.isPrimary() && unique_seq_only ) return false;
 
-		bool hasEdits = al.handleEdits();
+		bool hasEdits = al.handleEdits(ref_seq_handler);
+		// TODO: if MD string is not available with the optional fields
+		// make sure we know where mismatches are
 
-		// cerr << "after hadnled edits: rej=" << al.isRejected() << " hasEd=" << hasEdits << endl;
 		// return early if no edits or can not encode the edits for some reason
 		if (al.isRejected() || !hasEdits) {
 			return hasEdits;
 		}
-		// if (!hasEdits) {
-		// 	addUnsignedByte(0, out_buffers.edits_buf);
-		// 	return hasEdits;
-		// }
 
 	    int num_edit_bytes = 0;
 	    // calculate number of bytes needed for edits
@@ -209,10 +216,12 @@ private:
 	    }
 	    if (al.lhc() > 0) {
 	    	// cerr << "l";
+	    	edit_count++;
 	    	num_edit_bytes += 2;
 	    }
 	    if (al.rhc() > 0) {
 	    	// cerr << "r";
+	    	edit_count++;
 	    	num_edit_bytes += 2;
 	    }
 	    if (al.merged_edits.size() > 0) {
@@ -245,6 +254,8 @@ private:
 		// cerr << " Edit len: " << (int)num_edit_bytes << endl;
 	    // edit_stream << (unsigned char)num_edit_bytes;
 	    addUnsignedByte(num_edit_bytes, out_buffers.edits_buf);
+
+	    edit_count += al.merged_edits.size();
 
 	    // write out clipping events
 	    int prev_edit_offset = 0;
@@ -524,7 +535,9 @@ private:
 	////////////////////////////////////////////////////////////////
 	bool processRead(IOLibAlignment & al, bool & first) {
 	    bool rejected = false, new_transcript = false;
+	    // get reference sequence ID
 	    auto ref = al.ref();
+	    // if this is the first first alignments
 	    if (first) {
 	    	cerr << "Assuming uniform read len of " << al.read_len() << " bases" << endl;
 	    	writeReadLen(al.read_len(), out_buffers.edits_buf);
@@ -535,8 +548,8 @@ private:
 	    	addReference(prev_ref, first, out_buffers.offsets_buf);
 	    	new_transcript = true;
 	    }
+	    // starting a different chromosome -- finish the line, write out a new ref id
 	    else if (ref != prev_ref) {
-	    	// starting a different chromosome -- dump offsets to a file
 	    	outputPair(offset_pair);
 	    	offset_pair = make_pair(0,0);
 	    	prev_offset = 0;
