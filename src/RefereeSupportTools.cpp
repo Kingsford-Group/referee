@@ -92,12 +92,9 @@ double rolling_depth(string & fname, size_t & genome_len, int const read_len) {
 	deque<int> covered_bases(read_len, 0);
 	size_t sum = 0;
 	OffsetsStream offs(fname);
-
 	int ref_id = offs.getNextTranscript();
 	int last_offset = 0, huh = 0;
-
 	cerr << "ref=" << ref_id+1 << " ";
-
 	while ( offs.hasMoreOffsets() ) {
 		int offset = offs.getNextOffset();
 		if (last_offset == 0) {
@@ -106,14 +103,12 @@ double rolling_depth(string & fname, size_t & genome_len, int const read_len) {
 		// switching to the next reference string
 		if (offset == END_OF_TRANS) {
 			last_offset = 0;
-			// cerr << "new trans ";
 			// add up counts in covered_bases; reset to 0's
 			for (int i = 0; i < covered_bases.size(); i++) {
 				sum += covered_bases[i];
 				covered_bases[i] = 0;
 				genome_len++;
 			}
-
 			ref_id = offs.getNextTranscript();
 			if (ref_id == END_OF_STREAM) {
 				cerr << "Done" << endl;
@@ -134,13 +129,10 @@ double rolling_depth(string & fname, size_t & genome_len, int const read_len) {
 			}
 			for (int i = 0; i < offset - last_offset; i++ ) {
 				sum += covered_bases.front(); // fold
-				// cerr << "sum=" << sum << " ";
 				covered_bases.pop_front();	// pop
 				covered_bases.push_back(0);	// push a new count on the end
 				genome_len++;
-				// cerr << "g=" << genome_len << " ";
 			}
-
 			// add 1 to all bases that this read covers
 			for (int i = 0; i < read_len; i++) {
 				covered_bases[i]++;
@@ -148,9 +140,7 @@ double rolling_depth(string & fname, size_t & genome_len, int const read_len) {
 			// remember the last offset
 			last_offset = offset;
 		}
-	}
-
-	cerr << "huh events: " << huh << endl;
+	}	
 	if (genome_len > 0) return sum / (double)genome_len;
 	else return 0;
 }
