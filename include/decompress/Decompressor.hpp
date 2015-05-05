@@ -14,6 +14,9 @@
 #include "OffsetsStream.hpp"
 #include "EditsStream.hpp"
 #include "ClipStream.hpp"
+#include "ReadIDStream.hpp"
+#include "FlagsStream.hpp"
+#include "QualityStream.hpp"
 // #include "MergedEditsStream.hpp"
 #include "TranscriptsStream.hpp"
 
@@ -47,19 +50,25 @@ public:
 		ref_path(ref_path) { }
 
 	////////////////////////////////////////////////////////////////
-	//
+	// Reconstruct SAM file by combining the inputs; restoring reads and quals
 	////////////////////////////////////////////////////////////////
 	void decompress() {
+		// sequence-specific streams
 		OffsetsStream offs(file_name);
 		EditsStream edits(file_name);
 		ClipStream left_clips(file_name, ".left_clip" );
 		ClipStream right_clips(file_name, ".right_clip" );
-		// MergedEditsStream edits(file_name, read_len);
+		
 		read_len = edits.getReadLen();
 		cerr << "Read length:\t" << (int)read_len << endl;
 		TranscriptsStream transcripts(file_name, ref_path, "-d");
 		recovered_file.open( output_name.c_str() );
 		// TODO: check if opened successfully
+
+		// other streams
+		ReadIDStream readIDs(file_name);
+		FlagsStream flags(file_name/*, transcripts*/);
+		QualityStream qualities(file_name, /* K_c */ 4); // TODO: a parameter
 
 		int ref_id = offs.getNextTranscript();
 		int i = 0;
@@ -88,10 +97,10 @@ public:
 				if (edits.hasEdits() ) {
 					// extract edits
 					vector<uint8_t> edit_ops = edits.getEdits();
-					reconstructAlignment(offset, read_len, ref_id, transcripts, edit_ops, left_clips, right_clips); // TODO: add right and left clips
+					reconstructAlignment(offset, read_len, ref_id, transcripts, edit_ops, left_clips, right_clips, readIDs, flags, qualities); // TODO: add right and left clips
 				}
 				else {
-					reconstructAlignment(offset, ref_id, transcripts);
+					reconstructAlignment(offset, ref_id, transcripts, readIDs, flags, qualities);
 				}
 			}
 			i++;
@@ -106,7 +115,7 @@ public:
 
 ////////////////////////////////////////////////////////////////
 //
-//
+// Privates
 //
 ////////////////////////////////////////////////////////////////
 private:
@@ -125,23 +134,39 @@ private:
 	// reconstructs read without edits
 	// TODO: fill out a iolib staden BAM record and write to a bam format
 	////////////////////////////////////////////////////////////////
-	void reconstructAlignment(int offset, int ref_id, TranscriptsStream & transcripts) {
+	void reconstructAlignment(int offset, int ref_id, TranscriptsStream & transcripts,
+			ReadIDStream & read_ids,
+			FlagsStream & flags,
+			QualityStream & qualities) {
 		// TODO
-		// recovered_file << read_id << "\t" << flags << "\t";
+		string read_id;
+		if ( read_ids.getNextID(read_id) != SUCCESS) {
+			cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
+			read_id = "*";
+		}
+		auto alignment_flags = flags.getNextFlagSet();
+		assert(alignment_flags.size() == 5);
+		int flag = alignment_flags[0], mapq = alignment_flags[1], 
+			rnext = alignment_flags[2], pnext = alignment_flags[3], 
+			tlen = alignment_flags[4];
+
+		recovered_file << read_id << "\t" << flag << "\t";
 		
 		// write out reference name, offset (SAM files use 1-based offsets)
-		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1);
-		// // get read sequence
-		// string read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
-		// // to upper case
+		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) << "\t" << mapq;
+		// get read sequence
+		string read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
+		// to upper case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
-		// // write out CIGAR string -- all matches
-		// recovered_file << "\t" << (int)read_len << "M";
-		// // TODO: write out columns with quality mapping, PNEXT, ...
-		// recovered_file << "\t" << read; 
-		// // TODO: write out qual vector
-		// // recovered_file << qual;
-		// // skip MD -- read has no edits
+
+		// write out CIGAR string -- all matches
+		recovered_file << "\t" << (int)read_len << "M";
+		// TODO: write out columns with quality mapping, PNEXT, ...
+		recovered_file << "\t" << rnext << "\t" << pnext << "\t" << tlen;
+		recovered_file << "\t" << read; 
+		// TODO: write out qual vector
+		recovered_file << qualities.getNextQualVector();
+		// skip MD -- read has no edits
 		recovered_file << endl;
 	}
 
@@ -152,29 +177,43 @@ private:
 			TranscriptsStream & transcripts, 
 			vector<uint8_t> & edits, 
 			ClipStream & left_clips,
-			ClipStream & right_clips) {
-		// TODO
-		// recovered_file << read_id << "\t" << flags << "\t";
+			ClipStream & right_clips,
+			ReadIDStream & read_ids,
+			FlagsStream & flags,
+			QualityStream & qualities) {
+		// get read ID for this alignment
+		string read_id;
+		if ( read_ids.getNextID(read_id) != SUCCESS) {
+			cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
+			read_id = "*";
+		}
+		auto alignment_flags = flags.getNextFlagSet();
+		assert(alignment_flags.size() == 5);
+		int flag = alignment_flags[0], mapq = alignment_flags[1], 
+			rnext = alignment_flags[2], pnext = alignment_flags[3], 
+			tlen = alignment_flags[4];
+		
+		// write out read ID, flag value
+		recovered_file << read_id << "\t" << flag << "\t";
 		// write out reference name, offset (1-based in SAMs)
 		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) ;
-		// // TODO
-		// // int left_clip_len = 0, right_clip_len = 0;
-		// // string read = getTranscriptSequence(ref_id, offset + left_clip_len, read_len - left_clip_len - right_clip_len);
-		// string cigar, md_string = "MD:Z:";
-		// string read = buildEditStrings(read_len, edits, cigar, md_string, left_clips, right_clips, offset, ref_id, transcripts);
+		string cigar, md_string = "MD:Z:";
+		string read = buildEditStrings(read_len, edits, cigar, md_string, left_clips, right_clips, offset, ref_id, transcripts);
+		// TODO: need to convert? diff can ignore case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
-		// recovered_file << "\t" << cigar;
-		// // TODO: write out mapq, PNEXT, ....
-		// // write out the read sequence
-		// recovered_file << "\t" << read;
-		// // TODO: write out qual vector
-		// // recovered_file << "\t" << qual;
-		// recovered_file << "\t" << md_string;
+
+		// write out mapq value, cigar
+		recovered_file << "\t" << mapq << "\t" << cigar << "\t" << rnext << "\t" << pnext << "\t" << tlen;
+		// write out the read sequence
+		recovered_file << "\t" << read;
+		// TODO: write out qual vector
+		recovered_file << "\t" << qualities.getNextQualVector();
+		recovered_file << "\t" << md_string;
 		recovered_file << endl;
 	}
 
 	////////////////////////////////////////////////////////////////
-	//
+	// build CIGAR, MD strings for the read with edits
 	////////////////////////////////////////////////////////////////
 	string buildEditStrings(int read_len, vector<uint8_t> & edits, string & cigar, string & md_string, ClipStream & left_clips,
 			ClipStream & right_clips,
@@ -415,102 +454,6 @@ private:
 		// cerr << cigar << "\t" << md_string << endl;
 		return read;
 	}
-
-
-	////////////////////////////////////////////////////////////////
-	//
-	////////////////////////////////////////////////////////////////
-	// string applyEdits(int const & offset, char const & read_len, 
-	// 	string const & edit,
-	// 	bool rc,
-	// 	shared_ptr<queue<string>> & left_clips,
-	// 	shared_ptr<queue<string>> & right_clips,
-	// 	shared_ptr<string> & trans_seq, string & read_id) {
-	// 	string read = trans_seq->substr(offset, read_len);
-
-	// 	auto edit_len = edit.size();
-	// 	if (edit_len == 0)
-	// 		return read;
-
-	// 	bool print = true;
-	// 	// if (read_id.compare("SOLEXA5_133_6_91_4706_2537_0") == 0) print = true;
-
-	// 	vector<pair<char,unsigned short>> edit_pairs;
-	// 	unsigned char offset_into_read = 0;
-	// 	int edit_pos = 0;
-	// 	int del_adjust = 0;
-	// 	int ins_adjust = 0;
-	// 	int j = 0;
-	// 	string left_clip;
-	// 	if (edit[j] == 'L') {// has left clip
-	// 		left_clip = left_clips->front();
-	// 		if (print) cerr << "L " << left_clip << " ";
-	// 		left_clips->pop();
-	// 		read = left_clip + read.substr(0, read_len - left_clip.size());
-	// 		assert(read.size() == read_len);
-	// 		edit_pos += left_clip.size();
-	// 		// cerr << "ed pos: " << edit_pos << " "; 
-	// 		j++;
-	// 	}
-	// 	if (j < edit_len && edit[j] == 'R') {
-	// 		string right_clip = right_clips->front();
-	// 		if (print) cerr << "R " << right_clip << " ";
-	// 		right_clips->pop();
-	// 		read.replace(read_len - right_clip.size(), right_clip.size(), right_clip);
-	// 		assert(read.size() == read_len);
-	// 		j++;
-	// 	}
-
-	// 	// deal with splices
-	// 	while (j < edit_len && edit[j] == 'E') {
-	// 		// TODO
-	// 		j += 4;
-	// 		cerr << "splice done ";
-	// 	}
-
-	// 	while (j < edit_len) {
-	// 		char edit_letter = edit[j++];
-	// 		edit_pos += edit[j];
-	// 		// cerr << "ed pos: " << edit_pos << " "; 
-	// 		if (print) cerr << edit_letter << "," << (int)edit[j] << " ";
-
-	// 		if (edit_letter == 'D') {
-	// 			assert(trans_seq->size() > offset - 1 + read.size() + 1 + del_adjust);
-	// 			del_adjust++;
-	// 		}
-	// 		else if (edit_letter == 'H') {
-	// 			cerr << "Hard clip" << endl;
-				
-	// 		}
-	// 		else if (edit_letter >= 'V' && edit_letter <= 'Z') {
-	// 			read.insert(edit_pos, 1, reverseReplace(edit_letter));
-	// 			// once we're done with all the edits, we will erase the right most chars that slid off
-	// 		}
-	// 		else if (edit_letter == 'E') {
-	// 			cerr << "this should not happen ";
-	// 			if (print) { cerr << read_len - offset_into_read << " ";
-	// 			cerr << "t: " << trans_seq->substr(offset - 1 + edit[j], read_len) << " ";
-	// 			}
-	// 			string spliced_piece = trans_seq->substr(offset - 1 + offset_into_read - left_clip.size() + edit[j], read_len - offset_into_read);
-	// 			if (print) cerr << spliced_piece;
-	// 			read.replace(offset_into_read + ins_adjust + del_adjust, spliced_piece.size(), spliced_piece);
-	// 			if (print) cerr << " r: " << read << endl;
-	// 		}
-	// 		else {
-	// 			// cerr << (edit_pos + ins_adjust) << " (" << read.size() << ") ";
-	// 			read[edit_pos + ins_adjust] = edit_letter;
-	// 		}
-	// 		j++;
-	// 	}
-	// 	if (print)cerr << endl;
-
-	// 	// trim read at the end if we have accumulated additional bases through insertions
-	// 	read = read.substr(0, read_len);
-	// 	if (rc) {
-	// 		reverse_complement(read);
-	// 	}
-	// 	return read;
-	// }
 
 };
 

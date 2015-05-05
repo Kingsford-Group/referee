@@ -13,7 +13,7 @@ public:
 	}
 
 	string peekNext() {
-		cerr << "current_clip: " << current_clip;
+		// cerr << "current_clip: " << current_clip;
 		return current_clip;
 	}
 

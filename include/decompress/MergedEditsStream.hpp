@@ -5,7 +5,6 @@
 #include <memory>
 
 #include "InputBuffer.hpp"
-#include "TransUtils.hpp"
 #include "RefereeUtils.hpp"
 
 class MergedEditsStream {
