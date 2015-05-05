@@ -4,6 +4,7 @@
 #include <cmath>
 #include <numeric>
 #include <cassert>
+#include <deque>
 
 #include "decompress/OffsetsStream.hpp"
 #include "decompress/MergedEditsStream.hpp"
@@ -80,6 +81,80 @@ double depth(string & fname, size_t & genome_len, int const read_len) {
 	else return 0;
 }
 
+
+////////////////////////////////////////////////
+// does not account for splicing events
+// are clipped regions part of the coverage?
+// does not keep the whole array for covered bases around (low-mem and faster)
+////////////////////////////////////////////////
+double rolling_depth(string & fname, size_t & genome_len, int const read_len) {
+	// initialize vector long enough for a bacterial genome
+	deque<int> covered_bases(read_len, 0);
+	size_t sum = 0;
+	OffsetsStream offs(fname);
+
+	int ref_id = offs.getNextTranscript();
+	int last_offset = 0, huh = 0;
+
+	cerr << "ref=" << ref_id+1 << " ";
+
+	while ( offs.hasMoreOffsets() ) {
+		int offset = offs.getNextOffset();
+		if (last_offset == 0) {
+			last_offset = offset;
+		}
+		// switching to the next reference string
+		if (offset == END_OF_TRANS) {
+			last_offset = 0;
+			// cerr << "new trans ";
+			// add up counts in covered_bases; reset to 0's
+			for (int i = 0; i < covered_bases.size(); i++) {
+				sum += covered_bases[i];
+				covered_bases[i] = 0;
+				genome_len++;
+			}
+
+			ref_id = offs.getNextTranscript();
+			if (ref_id == END_OF_STREAM) {
+				cerr << "Done" << endl;
+				break;
+			}
+			cerr << "ref=" << ref_id+1 << " ";
+		}
+		// done with everything
+		else if (offset == END_OF_STREAM) {
+			huh++;
+		}
+		// process the read
+		else {
+			// fold the items on the left that are out of range
+			// cerr << "off=" << offset << " last_off=" << last_offset <<  " ";
+			if (offset - last_offset > read_len) {
+				last_offset = offset - read_len;
+			}
+			for (int i = 0; i < offset - last_offset; i++ ) {
+				sum += covered_bases.front(); // fold
+				// cerr << "sum=" << sum << " ";
+				covered_bases.pop_front();	// pop
+				covered_bases.push_back(0);	// push a new count on the end
+				genome_len++;
+				// cerr << "g=" << genome_len << " ";
+			}
+
+			// add 1 to all bases that this read covers
+			for (int i = 0; i < read_len; i++) {
+				covered_bases[i]++;
+			}
+			// remember the last offset
+			last_offset = offset;
+		}
+	}
+
+	cerr << "huh events: " << huh << endl;
+	if (genome_len > 0) return sum / (double)genome_len;
+	else return 0;
+}
+
 ////////////////////////////////////////////////
 //
 // 
@@ -143,7 +218,7 @@ int main(int argc, char * argv []) {
     if (task.compare("depth") == 0) {
     	// compute depth of coverage normalizing by # of covered bases
     	size_t g = 0;
-    	double d = depth(fname, g, read_len);
+    	double d = rolling_depth(fname, g, read_len);
     	cerr << "Average depth of coverage over covered bases: " << d << 
     		" (covered bases: " << g << ")" << endl;
     }

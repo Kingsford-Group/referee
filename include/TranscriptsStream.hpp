@@ -15,6 +15,7 @@ public:
 		else {
 			// if decompressing: read a t_map
 			t_map = parseTranscriptIDsPlain(file_name + ".head");	
+			// TODO: also: read dictionaries for the flags
 		}
 		readFAI(ref + ".fai");
 		// TODO: read reference seuqence on request, one at a time, not all at once
