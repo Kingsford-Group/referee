@@ -14,16 +14,18 @@ export DYLD_LIBRARY_PATH=plzip:$DYLD_LIBRARY_PATH
 
 # sudo purge -n
 
-# DIR=/mnt/scratch0/dfilippo/aligned
+# DATADIR=/mnt/scratch0/dfilippo/aligned
 DIR=/data/referee/aligned
 FILE=SRR445718.2m.sam
 # FILE=SRR445718.sam
 #FILE=SRR1294122.sam
 #DIR=.
 # FILE=test.sam
-# FILE=P_aeruginosa_PAO1.10mil.sam
-# GENOME=NC_002516.fna
-GENOME=/data/referee/aligned/human_genome.fa
+# FILE=P_aeruginosa_PAO1
+# PAERUG_GENOME=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_002516.fna
+# HUMAN_GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
+# GENOME=$DIR/human_genome.fa
+GENOME=$DIR/human_chr10_37.2.fa
 #FILE=K562_cytosol_LID8465_TopHat_v2.sam
 # FILE=NA12878_S1.sorted.sam
 # rm -f $DIR/$FILE.offs.lz

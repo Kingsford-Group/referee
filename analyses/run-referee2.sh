@@ -14,20 +14,21 @@ export DYLD_LIBRARY_PATH=plzip:$DYLD_LIBRARY_PATH
 # purge memory cache
 # sudo purge -n
 
-TIMEOPT="-lp"
-# TIMEOPT="-v"
+#TIMEOPT="-lp"
+TIMEOPT="-v"
 
-# DIR="/mnt/scratch0/dfilippo/aligned"
-DIR="/data/referee/aligned"
-SEQMODE="--seq"
+DIR="/mnt/scratch0/dfilippo/aligned"
+# DIR="/data/referee/aligned"
+# SEQMODE="--seq"
 
 # samfiles=("P_aeruginosa_PAO1" "SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2")
 # samfiles=("SRR1294122" "SRR445718" "P_aeruginosa_PAO1")
-#samfiles=("SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2")
+samfiles=("SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2")
 #samfiles=("SRR1294122")
 #samfiles=("MiSeq_Ecoli_DH10B_110721_PF")
-samfiles=("P_aeruginosa_PAO1.10mil")
-GENOME=NC_002516.fna
+#samfiles=("P_aeruginosa_PAO1.10mil")
+#GENOME=NC_002516.fna
+GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
 for ((i=0; i < ${#samfiles[@]}; i++))
 do
 	echo $i
@@ -54,7 +55,7 @@ do
 	# ls -l $SRC
 	echo "----------------"
 	echo " Compress $DIR/$FILE.sam, log at $LOG"
-	/usr/bin/time $TIMEOPT $EXE -c $SRC -t 10 -r $DIR/$GENOME --seq 2> $LOG
-	plzip -f -n 10 $SRC.has_edits
-	#plzip -f -n 10 $SRC.*membership
+	/usr/bin/time $TIMEOPT $EXE -c $SRC -t 10 -r $GENOME $SEQMODE 2> $LOG
+	plzip -fv -n 10 $SRC.has_edits
+	plzip -fv -n 10 $SRC.*membership
 done

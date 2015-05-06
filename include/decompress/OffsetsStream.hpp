@@ -48,7 +48,7 @@ public:
 		}
 		else if (current_multiplier > 0) {
 			current_multiplier--; // used up one of the copies of this read
-			current_offset += delta;
+			// current_offset += delta;
 			return current_offset;
 		}
 		else {
@@ -69,10 +69,11 @@ public:
 			if (c == '\n') {
 				current_transcript = -1;
 			}
+			// delta from the previous absolute offset
 			delta = stoi( string(chunk.begin(), chunk.end() ) );
 			current_offset += delta;
-			
-			if (c == ':') {// parse the multiplier
+			// now parse the multiplier if it exists
+			if (c == ':') {
 				chunk.clear();
 				c = offsets_in->getNextByte();
 				while (c != ' ' && c != '\n' && offsets_in->hasMoreBytes()) {
@@ -83,7 +84,7 @@ public:
 					current_transcript = -1;
 				}
 				current_multiplier = stoi( string(chunk.begin(), chunk.end() ) );
-				current_multiplier--;	// will return this offsets once right now
+				current_multiplier--;	// will return this offset once right now
 			}
 			return current_offset;
 		}

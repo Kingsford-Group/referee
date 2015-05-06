@@ -4,12 +4,12 @@ INDIR=/mnt/scratch0/dfilippo/aligned
 
 echo "Genome: $HUMAN_GENOME"
 
-for FILE in SRR445718 SRR1294122 # NA12878\_S1 K562_cytosol_LID8465_TopHat_v2
+for FILE in SRR445718 SRR1294122 K562_cytosol_LID8465_TopHat_v2 # NA12878\_S1 K562_cytosol_LID8465_TopHat_v2
 do
 	INPUT=$INDIR/$FILE.sam
 	OUTPUT=$INDIR/$FILE.dz
 	rm -f $OUTPUT
 	echo "Compressing: $FILE"
 	echo "/usr/bin/time -v $DZDIR/deez -r $HUMAN_GENOME $INPUT -o $OUTPUT 2> $INDIR/$FILE.dz_comp.log"
-	/usr/bin/time -v $DZDIR/deez -r $HUMAN_GENOME $INPUT -o $OUTPUT 2> $INDIR/$FILE.dz_comp.log
+	/usr/bin/time -v $DZDIR/deez -t 10 -r $HUMAN_GENOME $INPUT -o $OUTPUT 2> $INDIR/$FILE.dz_comp.log
 done

@@ -348,10 +348,12 @@ private:
 	    }
 	    else {
 	    	auto delta = (offset - prev_offset);
-	    	if (offset_pair.first == delta ) {
-		    	offset_pair.second++;
-		    	// cerr << "branch 2" << endl;
-		    }
+	    	if (delta == 0) {
+	    		offset_pair.second++;
+	    	}
+	    	// if (offset_pair.first == delta ) {
+		    // 	offset_pair.second++;
+		    // }
 		    else {
 		    	// offset is different -- write prev to byte stream, store this new one
 		    	outputPair(offset_pair);
