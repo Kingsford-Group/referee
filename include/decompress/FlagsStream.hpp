@@ -15,7 +15,7 @@ public:
 
 	int getNextFlagSet(vector<int> & flags) {
 		// TODO
-		vector<int> flags;
+		vector<int> loc_flags;
 
 		if ( !flags_in->hasMoreBytes() ) return END_OF_STREAM;
 
@@ -25,14 +25,14 @@ public:
 			if (c == ' ') {
 				int value = stoi(chunk);
 				// if mapped: dictionary[mapped_value]
-				flags.push_back(value);
+				loc_flags.push_back(value);
 				chunk = "";
 			}
 			else
 				chunk.push_back(c);
 			c = flags_in->getNextByte();
 		}
-		id = chunk;
+		flags = loc_flags;
 		if (chunk.size() == 0 || c == 0) {
 			return END_OF_STREAM;
 		}

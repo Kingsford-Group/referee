@@ -58,7 +58,7 @@ public:
 		EditsStream edits(file_name);
 		ClipStream left_clips(file_name, ".left_clip" );
 		ClipStream right_clips(file_name, ".right_clip" );
-		
+
 		read_len = edits.getReadLen();
 		cerr << "Read length:\t" << (int)read_len << endl;
 		TranscriptsStream transcripts(file_name, ref_path, "-d");
@@ -139,33 +139,34 @@ private:
 			FlagsStream & flags,
 			QualityStream & qualities) {
 		// TODO
-		string read_id;
-		if ( read_ids.getNextID(read_id) != SUCCESS) {
-			cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
-			read_id = "*";
-		}
-		auto alignment_flags = flags.getNextFlagSet();
-		assert(alignment_flags.size() == 5);
-		int flag = alignment_flags[0], mapq = alignment_flags[1], 
-			rnext = alignment_flags[2], pnext = alignment_flags[3], 
-			tlen = alignment_flags[4];
+//		string read_id;
+//		if ( read_ids.getNextID(read_id) != SUCCESS) {
+//			cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
+//			read_id = "*";
+//		}
+//		auto alignment_flags = flags.getNextFlagSet();
+//		assert(alignment_flags.size() == 5);
+//		int flag = alignment_flags[0], mapq = alignment_flags[1], 
+//			rnext = alignment_flags[2], pnext = alignment_flags[3], 
+//			tlen = alignment_flags[4];
 
-		recovered_file << read_id << "\t" << flag << "\t";
-		
+//		recovered_file << read_id << "\t" << flag << "\t";
+
 		// write out reference name, offset (SAM files use 1-based offsets)
-		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) << "\t" << mapq;
+//		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1);
+//		recovered_file << "\t" << mapq;
 		// get read sequence
 		string read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
 		// to upper case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
 
 		// write out CIGAR string -- all matches
-		recovered_file << "\t" << (int)read_len << "M";
+//		recovered_file << "\t" << (int)read_len << "M";
 		// TODO: write out columns with quality mapping, PNEXT, ...
-		recovered_file << "\t" << rnext << "\t" << pnext << "\t" << tlen;
-		recovered_file << "\t" << read; 
+//		recovered_file << "\t" << rnext << "\t" << pnext << "\t" << tlen;
+		recovered_file << "\t" << read;
 		// TODO: write out qual vector
-		recovered_file << qualities.getNextQualVector();
+//		recovered_file << qualities.getNextQualVector();
 		// skip MD -- read has no edits
 		recovered_file << endl;
 	}
@@ -173,15 +174,16 @@ private:
 	////////////////////////////////////////////////////////////////
 	// reconstructs a read that had edits
 	////////////////////////////////////////////////////////////////
-	void reconstructAlignment(int offset, int read_len, int ref_id, 
-			TranscriptsStream & transcripts, 
-			vector<uint8_t> & edits, 
+	void reconstructAlignment(int offset, int read_len, int ref_id,
+			TranscriptsStream & transcripts,
+			vector<uint8_t> & edits,
 			ClipStream & left_clips,
 			ClipStream & right_clips,
 			ReadIDStream & read_ids,
 			FlagsStream & flags,
 			QualityStream & qualities) {
 		// get read ID for this alignment
+/*
 		string read_id;
 		if ( read_ids.getNextID(read_id) != SUCCESS) {
 			cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
@@ -192,23 +194,23 @@ private:
 		int flag = alignment_flags[0], mapq = alignment_flags[1], 
 			rnext = alignment_flags[2], pnext = alignment_flags[3], 
 			tlen = alignment_flags[4];
-		
+
 		// write out read ID, flag value
 		recovered_file << read_id << "\t" << flag << "\t";
 		// write out reference name, offset (1-based in SAMs)
 		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) ;
-		string cigar, md_string = "MD:Z:";
+*/		string cigar, md_string = "MD:Z:";
 		string read = buildEditStrings(read_len, edits, cigar, md_string, left_clips, right_clips, offset, ref_id, transcripts);
 		// TODO: need to convert? diff can ignore case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
 
 		// write out mapq value, cigar
-		recovered_file << "\t" << mapq << "\t" << cigar << "\t" << rnext << "\t" << pnext << "\t" << tlen;
+//		recovered_file << "\t" << mapq << "\t" << cigar << "\t" << rnext << "\t" << pnext << "\t" << tlen;
 		// write out the read sequence
 		recovered_file << "\t" << read;
 		// TODO: write out qual vector
-		recovered_file << "\t" << qualities.getNextQualVector();
-		recovered_file << "\t" << md_string;
+//		recovered_file << "\t" << qualities.getNextQualVector();
+//		recovered_file << "\t" << md_string;
 		recovered_file << endl;
 	}
 
