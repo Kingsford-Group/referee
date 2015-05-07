@@ -7,7 +7,7 @@
 #include <deque>
 
 #include "decompress/OffsetsStream.hpp"
-#include "decompress/MergedEditsStream.hpp"
+#include "decompress/EditsStream.hpp"
 
 using namespace std;
 
@@ -152,14 +152,20 @@ double rolling_depth(string & fname, size_t & genome_len, int const read_len) {
 ////////////////////////////////////////////////
 size_t total_edits(string & fname) {
 	uint8_t readlen;
-	MergedEditsStream edits(fname, readlen);
+	EditsStream edits(fname);
 	size_t edit_cnt = 0;
+	size_t total_alignments = edits.getAlignmentCount();
+	short read_len = edits.getReadLen();
+	// if counted inside the loop -- get 2x of actual alignment count
+	size_t alignments_with_edits = 0;
 
 	int return_value = 0;
 	// size_t alignments = 0;
 	while ( (return_value = edits.next() ) != END_OF_STREAM) { // advance to the next alignment)
 		// alignments++;
+		// total_alignments++;
 		if (edits.hasEdits() ) {
+			alignments_with_edits++;
 			vector<uint8_t> edit_ops = edits.getEdits();
 			for (int i = 0; i < edit_ops.size(); i++) {
 				switch (edit_ops[i]) {
@@ -188,7 +194,9 @@ size_t total_edits(string & fname) {
 			}
 		}
 	}
-	// cerr << "saw " << alignments << " alignments" << endl;
+	cerr << "Saw " << total_alignments << " total alignments; of them " << alignments_with_edits << " had edits." << endl;
+	cerr << "Error rate: " << (long double)edit_cnt / (total_alignments * read_len) * 100 << "%" << endl;
+	// TODO: total_alignments almost 2x that of actual number. figure it out
 	return edit_cnt;
 }
 

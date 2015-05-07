@@ -45,7 +45,7 @@ GENOME=$DIR/human_chr10_37.2.fa
 # TIMEOPT="-v"
 TIMEOPT="-lp"
 
-/usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t 10 -r $GENOME --seq # > $DIR/$FILE.seq_comp.log 2>&1
+/usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t 10 -r $GENOME # > $DIR/$FILE.seq_comp.log 2>&1
 # ls -l $DIR/$FILE.*
 # time plzip -vf $DIR/$FILE.k\=* 2> $DIR/$FILE.plzip
 # python python/parse_plzip_output.py $DIR/$FILE.plzip

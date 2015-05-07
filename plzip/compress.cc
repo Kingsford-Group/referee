@@ -281,6 +281,7 @@ extern "C" void * cworker( void * arg )
     while( true ) {
       if( LZ_compress_write_size( encoder ) > 0 ) {
         if( written < packet->size ) {
+          // copy input bytes to a buffer maintained by the encoder
           const int wr = LZ_compress_write( encoder, packet->data + written,
                                           packet->size - written );
           if( wr < 0 ) internal_error( "library error (LZ_compress_write)" );
@@ -292,6 +293,8 @@ extern "C" void * cworker( void * arg )
           LZ_compress_finish( encoder ); 
         }
       }
+      // read compressed bytes from a buffer maintained by the encoder
+      // into new_data
       const int rd = LZ_compress_read( encoder, new_data + new_pos,
                                  max_compr_size - new_pos );
       if( rd < 0 ) {
@@ -316,7 +319,8 @@ extern "C" void * cworker( void * arg )
     }
 
     // if( verbosity >= 2 && packet->size > 0 ) show_progress( packet->size );
-    packet->data = new_data;
+    packet->data = new_data; // compressed bytes
+    // cerr << "Block: " << new_pos << "b ";
     packet->size = new_pos;
     courier.collect_packet( packet );
     }
@@ -324,8 +328,8 @@ extern "C" void * cworker( void * arg )
 }
 
 
-     // get from courier the processed and sorted packets, and write
-     // their contents to the output file.
+// get the processed and sorted packets from courier, write
+// their contents to the output file.
 void muxer( Packet_courier & courier /*, const Pretty_print & pp*/)
   {
   std::vector< const Packet * > packet_vector;
@@ -345,7 +349,7 @@ void muxer( Packet_courier & courier /*, const Pretty_print & pp*/)
       int outfd = opacket->outfd;
 
       if( outfd >= 0 ) {
-        // std::cerr << "muxer::write out a compressed block (size=" << opacket->size << ") to fd=" << outfd << std::endl;
+        std::cerr << "writing a compressed block (size=" << opacket->size << ") to fd=" << outfd << std::endl;
         const int wr = writeblock( outfd, opacket->data, opacket->size );
         if( wr != opacket->size )
           { 

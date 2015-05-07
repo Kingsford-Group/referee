@@ -49,18 +49,11 @@ public:
 
 	QualityCluster(Packet_courier * c, bool p = false): courier(c), is_pile(p) {}
 
-	QualityCluster(Packet_courier * c, string & profile, int K, bool p = false): courier(c), is_pile(p) {
+	QualityCluster(Packet_courier * c, string & profile, int K, char m, bool p = false): courier(c), is_pile(p), mode(m) {
 		this->profile = profile;
 		// build profile kmers
-		
 		auto kmers = countKmers(profile, K);
 		profile_kmers = make_shared<unordered_map<int,int>>( kmers );
-		// for (int i = 0; i < profile.size() - K + 1; i++) {
-		// 	auto kmer = profile.substr(i, K);
-		// 	if (profile_kmers->find(kmer) == profile_kmers->end()) 
-		// 		(*profile_kmers)[kmer] = 0;
-		// 	(*profile_kmers)[kmer]++;
-		// }
 	}
 
 	~QualityCluster() {
@@ -94,9 +87,42 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////
-	void writeCore(string & core) {
+	/*
+	# for i in xrange(n):
+	# 	symbol = line[i]
+	# 	if symbol.isdigit():
+	# 		# remap to a 130 range
+	# 		symbol =  chr(130 + int(symbol) )
+	# 	if symbol != 'J':
+	# 		delta = i - prev_pos - 1
+	# 		if delta > 0:
+	# 			edit_str += str(delta)
+	# 		edit_str += symbol
+	# 		prev_pos = i
+	*/
+	void writeCore(string const & core) {
 		total_vectors++;
-		writeString(core, output_str);
+		string deltas = "";
+		if (mode >= '!') {
+			// transform core into a string of deltas to the mode
+			int prev_pos = 0;
+			for (int i = 0; i < core.size(); i++) {
+				uint8_t symbol = core[i];
+				if (isdigit(symbol))
+					symbol = (uint8_t)(symbol + (uint8_t)130);
+				if (symbol != mode) {
+					int delta = i - prev_pos - 1;
+					if (delta > 0)
+						deltas += to_string(delta);
+					deltas.push_back(symbol);
+					prev_pos = i;
+				}
+			}
+		}
+		else {
+			deltas = core;
+		}
+		writeString(deltas, output_str);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -192,6 +218,7 @@ public:
 
 private:
 	Packet_courier * courier;
+	char mode = 0;
 	bool is_pile = false;
 	int cluster_id = -1;
 	size_t total_vectors = 0;

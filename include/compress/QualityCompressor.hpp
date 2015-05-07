@@ -15,48 +15,6 @@ maintains OutputBuffers for the clusters
 
 chrono::duration<double> elapsed_seconds_d2_loop2;
 chrono::duration<double> elapsed_seconds_d2_loop3;
-// float d2(shared_ptr<unordered_map<string, int>> profile_kmers, float const f1, string & q, int const K) {
-// 	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
-// 	// a map of pairs containing the counts
-// 	unordered_map<string, pair<int,int>> counts;
-// 	// number of kmers in the new string
-// 	float f2 = q.size() - K + 1;
-// 	// go through kmer in the profile and update counts
-// 	for (auto p : *profile_kmers) {
-// 		auto kmer = p.first;
-// 		if (counts.find(p.first) == counts.end()) 
-// 			counts[kmer] = make_pair(0,0);
-// 		counts[kmer].first = p.second;
-// 	}
-// 	chrono::time_point<chrono::system_clock> end = chrono::system_clock::now();
-// 	elapsed_seconds_d2_loop1 += (end - start);
-
-// 	start = chrono::system_clock::now();
-// 	// go through kmers in the new string and count kmers
-// 	for (int i = 0; i < q.size() - K + 1; i++) {
-// 		auto kmer = q.substr(i, K);
-// 		if (counts.find(kmer) == counts.end()) 
-// 			counts[kmer] = make_pair(0,0);
-// 		counts[kmer].second++;
-// 	}
-// 	end = chrono::system_clock::now();
-// 	elapsed_seconds_d2_loop2 += (end - start);
-
-	
-	
-// 	// compare kmer profiles
-// 	start = chrono::system_clock::now();
-// 	float d2_ = 0;
-// 	for (auto kmer_p : counts) {
-// 		pair<int,int> kmer_counts = kmer_p.second;
-// 		float delta = (kmer_counts.first/f1 - kmer_counts.second/f2);
-// 		d2_ += delta * delta;
-// 	}
-// 	end = chrono::system_clock::now();
-// 	elapsed_seconds_d2_loop3 += (end - start);
-// 	return d2_;
-// }
-
 
 
 float d2_fast(shared_ptr<unordered_map<int, int>> profile_kmers, float const f1, 
@@ -226,7 +184,7 @@ public:
 		// TODO: is this a documented fact that need to add '!'
 		for (auto i = 0; i < len; i++) s += qual_read[i] + '!';
 		if (observed_vectors <= bootstrap_size) {
-			assignQualityVector(s, len, observed_vectors, true);
+			assignQualityVector(s, len, observed_vectors);
 			if (observed_vectors == bootstrap_size) {
 				cerr << "Time in d2: loop1 " << elapsed_seconds_d2_loop1.count() << "s" << endl;
 				cerr << "Time in d2: loop2 " << elapsed_seconds_d2_loop2.count() << "s" << endl;
@@ -275,7 +233,7 @@ private:
 	///////////////////////////////////////////////////////////
 	// Assumes that q_v is already reverse according to the reverse complement bit
 	///////////////////////////////////////////////////////////
-	void assignQualityVector(string & q_v, int q_v_len, int id, bool allowNewClusters) {
+	void assignQualityVector(string & q_v, int q_v_len, int id) {
 		int mode_frequency = 0;
 		char m = weighted_mode(q_v, mode_frequency);
 		if (mode_frequency < 0.26 * q_v_len) {
@@ -302,19 +260,12 @@ private:
 			}
 
 			if (!found) {
-				if (allowNewClusters) {
-					// create a new cluster w/ this guy in it
-					shared_ptr<QualityCluster> cluster(new QualityCluster(courier, q_v, K_c));
-					cluster->add(q_v, id, prefix, suffix);
-					clusters.push_back(cluster);
-					if (clusters.size() % 100 == 0) cerr << clusters.size() << 
-						" (" << (id - others->size() ) << "|" << others->size() << ") ";
-				}
-				else {
-					// store into the generic pile
-					others->add(q_v, id);
-					cluster_membership.push_back(generic_pile_id);
-				}
+				// create a new cluster w/ this guy in it
+				shared_ptr<QualityCluster> cluster(new QualityCluster(courier, q_v, K_c, m));
+				cluster->add(q_v, id, prefix, suffix);
+				clusters.push_back(cluster);
+				if (clusters.size() % 100 == 0) cerr << clusters.size() << 
+					" (" << (id - others->size() ) << "|" << others->size() << ") ";
 			}
 		}
 	}
