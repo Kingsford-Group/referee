@@ -58,10 +58,10 @@ with open(sys.argv[1], "r") as f:
 				data[fprefix][file_type] = {}
 			data[fprefix][file_type][fsuffix] = file_size
 
-all_types = []
-for k,v in data.iteritems():
-	all_types += v.keys()
-all_types = list(set(all_types))
+all_types = ["Referee", "Quip", "Deez", "BAM", "SAM"]
+#for k,v in data.iteritems():
+#	all_types += v.keys()
+#all_types = list(set(all_types))
 # print all_types
 types_align = " ".join(["r" for i in range(len(all_types))])
 print "\\begin{tabular}{l " + types_align + "}"
@@ -77,7 +77,7 @@ for fname, sizes in items:
 		fname = fname.split(".")[0]
 	elif "SRR4457" in fname: fname = fname.split(".")[0]
 	#elif "K562" in fname: fname = "Human RNA-seq II"
-	elif "K562" in fname: fname = fname.split(".")[0]
+	elif "K562" in fname: fname = fname.split(".")[0].split("_")[0]
 	# elif "SRR445718" in fname: fname = "Human RNA-seq III"
 	#elif "NA128" in fname: fname = "Human genomic"
 	elif "NA128" in fname: fname = fname.split(".")[0]
@@ -94,9 +94,26 @@ for fname, sizes in items:
 		else:
 			size = "xxx"
 		ordered_sizes.append(size)
-	# ordered_sizes = [round( sum(sizes[file_type].values() ) / 1024.0 / 1024, 2) if file_type in sizes else "xxx" for file_type in all_types]
+	
+	# calculate % to the next best
 	min_size = min(ordered_sizes)
-	sizes_str = ["\\textbf{"+str(s)+"}" if s == min_size else str(s) for s in ordered_sizes]
+	next_best = min_size * 10
+	for i in xrange(len(ordered_sizes)):
+		if ordered_sizes[i] > min_size and ordered_sizes[i] < next_best:
+			next_best = ordered_sizes[i]
+	if next_best == 0:
+		percent = "xxx"
+	else:
+		percent = round( (1 - min_size / next_best) * 100, 1 )
+
+	sizes_str = []
+	for i in xrange(len(ordered_sizes)):
+		s = ordered_sizes[i]
+		if s == min_size:
+			sizes_str.append( "\\textbf{" + str(s) + "} (" + str(percent) + "%)" )
+		else:
+			sizes_str.append( str(s) )
+	# sizes_str = ["\\textbf{"+str(s)+"} (" +  if s == min_size else str(s) for s in ordered_sizes]
 	print fname + "\t& " + " & ".join(sizes_str) + " \\\\"
 
 print "\\bottomrule"

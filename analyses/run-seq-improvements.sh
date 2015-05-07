@@ -1,3 +1,9 @@
+# generates a stripped SAM if it does not already exist
+# removes readIDs, quals, optional fields, unaligned sequences
+# runs Referee, Quip, and Deez on the stripped SAM file
+# results are saved into individual logs
+# uses script strip-fields-from-sam.sh
+
 SETUP="1"
 
 if [ $SETUP -eq 1 ]

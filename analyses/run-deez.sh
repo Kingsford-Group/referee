@@ -4,7 +4,7 @@ INDIR=/mnt/scratch0/dfilippo/aligned
 
 echo "Genome: $HUMAN_GENOME"
 
-for FILE in SRR445718 SRR1294122 K562_cytosol_LID8465_TopHat_v2 # NA12878\_S1 K562_cytosol_LID8465_TopHat_v2
+for FILE in NA12878\_S1 # SRR445718 SRR1294122 K562_cytosol_LID8465_TopHat_v2 # NA12878\_S1 K562_cytosol_LID8465_TopHat_v2
 do
 	INPUT=$INDIR/$FILE.sam
 	OUTPUT=$INDIR/$FILE.dz

@@ -1,5 +1,5 @@
 DIR="/mnt/scratch0/dfilippo/aligned"
-samfiles=("P_aeruginosa_PAO1" "SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2")
+samfiles=("P_aeruginosa_PAO1" "SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2" "NA12878_S1")
 # samfiles=("SRR1294122" "SRR445718" "P_aeruginosa_PAO1")
 OUTPUT=all_files.sizes
 rm $OUTPUT

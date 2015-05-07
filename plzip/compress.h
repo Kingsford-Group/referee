@@ -98,7 +98,7 @@ public:
     return ipacket;
     }
 
-  // collect a packet from a worker
+  // collect a packet from a worker (contains compress bytes)
   void collect_packet( const Packet * const opacket )
     {
     const int i = opacket->id%num_slots;
@@ -140,7 +140,7 @@ public:
 
   void finish()     // splitter has no more packets to send
     {
-    std::cerr << "courier finish" << std::endl;
+    std::cerr << "Courier finished." << std::endl;
     xlock( &imutex );
     eof = true;
     xbroadcast( &iav_or_eof );

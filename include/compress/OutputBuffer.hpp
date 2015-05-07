@@ -261,6 +261,9 @@ void writeUnaligned(UnalignedRead & read, shared_ptr<OutputBuffer> o_str) {
 	o_str->data.push_back('>');
 	// write read id
 	for (auto c : read.read_name) o_str->data.push_back(c);
+	//int len = strlen(read.read_name);
+        //for (auto i = 0; i < len; i++)
+        //        o_str->data.push_back(read.read_name[i]);
 	o_str->data.push_back('\n');
 	// write read seq
 	for (auto c : read.seq) o_str->data.push_back(c);
