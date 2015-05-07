@@ -1,20 +1,38 @@
 import sys
 import os
 
+def getAlignmentCounts(file_name):
+	counts = {}
+	err = {}
+	depths = {}
+	with open(file_name, "r") as f:
+		for line in f:
+			parts = line.strip().split()
+			if len(parts) > 2:
+				fname, cnt, e, depth = line.strip().split()
+				print line
+				err[fname] = e
+				depths[fname] = depth
+			else:
+				fname, cnt = line.strip().split()
+			counts[fname] = int(cnt)
+	return counts, err, depths
+
 ################################
 def getReadLengths(file_name):
-	rl = {}
+	rl = []
 	with open(file_name, "r") as f:
 		cnt = 0
 		for line in f:
 			part = line.strip()
 			if cnt % 3 == 0: 
-				name = part
-				rl[name] = []
+				name = part.split(".")[0]
+				rl.append({})
+				rl[-1]["name"] = name
 			elif cnt % 3 == 1: 
-				rl[name].append( int(part) )
+				rl[-1]["rlen"] = int(part) - 1
 			elif cnt % 3 == 2: 
-				rl[name].append( int(part) )
+				rl[-1]["lines"] = int(part)
 			cnt+=1
 	return rl
 
@@ -45,6 +63,9 @@ def parseDeezLog(log_name, read_len):
 		return "---"
 
 	# print "parsing", log_name
+	seq = 0
+	edits = 0
+	line_count = 1
 	with open(log_name, "r") as f:
 		for line in f:
 			if "Written" in line and "lines" in line:
@@ -111,32 +132,47 @@ def parseQuipLog(log_name):
 ################################
 # Main
 ################################
+print "Parsing read lenghts"
+if len(sys.argv) <=2:
+	print "Not enough arguments"
+	print "Provide a path to file w/ read lengths and a path to directory with logs"
+	exit(1)
+
 RLen = getReadLengths(sys.argv[1])
+AL_counts, err_rates, depths = getAlignmentCounts("aligned_counts.txt")
+dir = sys.argv[2]
 
-all_types = ["Referee", "Deez", "Quip"]
+all_types = ["Referee", "Quip", "Deez"]
 types_align = " ".join(["r" for i in range(len(all_types))])
-print "\\begin{tabular}{l c r " + types_align + " r r}"
+print "\\begin{tabular}{l r " + types_align + " r r}"
 print "\\toprule"
-print "File & $|r|$ & Total bases & ", " & ".join(all_types), " & Error rate & Depth \\\\"
+print "File & Total bases & ", " & ".join(all_types), " & Error rate & Depth \\\\"
 print "\midrule"
-for file_name in sys.argv[2:]:
-	file_suff = file_name.split("/")[-1].split(".")[0]
-	if file_suff in RLen:
-		rl, aligned = RLen[file_suff]
-	else:
-		print "read info not available for " + file_suff
-		continue
-	super_name = file_name.split(file_suff)[0] + file_suff + ".sam"
+for file_info in RLen:
+	# file_suff = file_name.split("/")[-1].split(".")[0]
+	file_suff = file_info["name"]
+	# print file_suff
+	rl = file_info["rlen"]
+	lines = file_info["lines"]
+	#if file_suff in RLen:
+	#	rl, aligned = RLen[file_suff]
+	#else:
+	#	print "read info not available for " + file_suff
+	#	continue
+	super_name = dir + "/" + file_suff
+	# file_name.split(file_suff)[0] + file_suff + ".sam"
+
 	# print super_name
-	referee = getRefereeSize(super_name, rl * aligned)
-	deez = parseDeezLog(file_name + "stripped.deez.log", rl)
-	quip = parseQuipLog(file_name + "stripped.quip.log")
-	error_rate = "---"
-	depth = "---"
-	print "{} & {} & {} & {} & {} & {} & {} & {}".format(file_suff, rl, rl * aligned, referee, deez, quip, error_rate, depth)
+	if not file_suff in AL_counts:
+		print "No data on #alignments in", file_suff
+		continue
+	referee = getRefereeSize(super_name + ".sam", rl * AL_counts[file_suff])
+	deez = parseDeezLog(super_name + ".stripped.deez.log", rl)
+	quip = parseQuipLog(super_name + ".stripped.quip.log")
 
+	error_rate = err_rates[file_suff] if file_suff in err_rates else "XXX"
+	depth = depths[file_suff] if file_suff in depths else "XXX"
 
-
-
-
-
+	print "{} & {} & {} & {} & {} & {} & {} \\\\".format(file_suff, rl * AL_counts[file_suff], 
+		referee, quip, deez, 
+		error_rate, depth)
