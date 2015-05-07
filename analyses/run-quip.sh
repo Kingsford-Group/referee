@@ -5,8 +5,9 @@ PAERUG_GENOME=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_00
 #FILE=K562_cytosol_LID8465_TopHat_v2
 
 # samfiles=("P_aeruginosa_PAO1" "K562_cytosol_LID8465_TopHat_v2")
-samfiles=("P_aeruginosa_PAO1")
-genomes=($PAERUG_GENOME $HUMAN_GENOME_HG19 $HUMAN_GENOME_HG19)
+#samfiles=("P_aeruginosa_PAO1")
+samfiles=("NA12878_S1")
+genomes=($HUMAN_GENOME_HG19 $PAERUG_GENOME $HUMAN_GENOME_HG19 $HUMAN_GENOME_HG19)
 for ((i=0; i < ${#samfiles[@]}; i++))
 do
 	echo ""

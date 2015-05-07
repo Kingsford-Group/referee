@@ -268,6 +268,9 @@ void writeUnaligned(UnalignedRead & read, shared_ptr<OutputBuffer> o_str) {
 	//write read quals
 	for (auto c : read.qual) o_str->data.push_back(c);
 	o_str->data.push_back('\n');
+	// strand
+	o_str->data.push_back('+');
+	o_str->data.push_back('\n');
 	if (o_str->timeToDump()) o_str->compressAndWriteOut();
 }
 
