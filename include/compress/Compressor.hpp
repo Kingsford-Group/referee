@@ -445,6 +445,7 @@ private:
 
 	////////////////////////////////////////////////////////////////
 	void handleOptionalFields(IOLibAlignment & al) {
+		// find MD and excise it
 		// opt_stream << al.opt_fields() << endl;
 	}
 

@@ -17,13 +17,13 @@ export DYLD_LIBRARY_PATH=plzip:$DYLD_LIBRARY_PATH
 DIR=/mnt/scratch0/dfilippo/aligned
 # DIR=/data/referee/aligned
 # FILE=SRR445718.2m.sam
-FILE=SRR445718.sam
+# FILE=SRR445718.sam
 #FILE=SRR1294122.sam
 #DIR=.
 # FILE=test.sam
-# FILE=P_aeruginosa_PAO1
-# PAERUG_GENOME=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_002516.fna
-GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
+FILE=P_aeruginosa_PAO1.sam
+GENOME=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_002516.fna
+# GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
 # GENOME=$DIR/human_genome.fa
 # GENOME=$DIR/human_chr10_37.2.fa
 #FILE=K562_cytosol_LID8465_TopHat_v2.sam
@@ -45,8 +45,8 @@ GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
 TIMEOPT="-v"
 # TIMEOPT="-lp"
 
-T=10
-SEQ="--seq"
+T=1
+#SEQ="--seq"
 /usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t $T -r $GENOME $SEQ # > $DIR/$FILE.qualDelta.comp.log 2>&1
 # /usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t 10 -r $GENOME # > $DIR/$FILE.seq_comp.log 2>&1
 # ls -l $DIR/$FILE.*
