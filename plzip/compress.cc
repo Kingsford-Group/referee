@@ -349,7 +349,7 @@ void muxer( Packet_courier & courier /*, const Pretty_print & pp*/)
       int outfd = opacket->outfd;
 
       if( outfd >= 0 ) {
-        std::cerr << "writing a compressed block (size=" << opacket->size << ") to fd=" << outfd << std::endl;
+        // std::cerr << "writing a compressed block (size=" << opacket->size << ") to fd=" << outfd << std::endl;
         const int wr = writeblock( outfd, opacket->data, opacket->size );
         if( wr != opacket->size )
           { 

@@ -454,8 +454,29 @@ private:
 	bool printed_warning = false;
 	void processUnalignedRead(IOLibAlignment & al) {
 		// save for later
-		cerr << "Read name: " << al.read_name_len() << endl;
-		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), al.getSeq(), al.quals());
+		// cerr << "Read name: " << al.read_name_len() << endl;
+
+		// consider read's RC -- if it has a smaller minimizer, then pick RC
+		vector<uint8_t> seq = al.getSeq();
+		auto minimizer = getMinimizer(seq, 12);
+		auto r_seq = reverse_complement(seq);
+		auto r_min = getMinimizer(r_seq, 12);
+		// pick the smaller one
+		if ( minimizer.compare(r_min) > 0 ) seq = r_seq;
+/*		bool first_seq = false;
+		for (int i = 0; i < 12; i++) {
+			if (minimizer[i] < r_min[i]) {
+				first_seq = true;
+				break;
+			}
+			else if (minimizer[i] > r_min[i]) {
+				first_seq = false;
+				break;
+			}
+		}
+		if (!first_seq) seq = r_seq;
+*/
+		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), seq, al.quals());
 		// TODO: 10K - arbitrary parameter, may be as big or as small as one wants
 		if (unaligned_reads.size() >= 10000) {
 			flushUnalignedReads();

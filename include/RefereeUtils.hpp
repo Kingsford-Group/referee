@@ -124,6 +124,25 @@ inline void reverse_complement(string & s) {
         }
 }
 
+inline vector<uint8_t> reverse_complement(vector<uint8_t> & v) {
+	vector<uint8_t> copy(v);
+	reverse(copy.begin(), copy.end() );
+	for (int i = 0; i < copy.size(); i++)
+		if (copy[i] == 'T') copy[i] = 'A';
+		else if (copy[i] == 'A') copy[i] = 'T';
+		else if (copy[i] == 'C') copy[i] = 'G';
+		else if (copy[i] == 'G') copy[i] = 'C';
+	return copy;
+}
+
+inline string getMinimizer(vector<uint8_t> & v, int len) {
+	vector<string> kmers;
+	for (int i = 0; i < v.size() - len + 1; i++)
+		kmers.push_back( string(v.begin() + i, v.begin() + i + len) );
+	sort(kmers.begin(), kmers.end() );
+	return kmers[0];
+}
+
 ////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////

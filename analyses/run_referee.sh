@@ -46,8 +46,8 @@ TIMEOPT="-v"
 # TIMEOPT="-lp"
 
 T=10
-SEQ=""
-/usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t $T -r $GENOME > $DIR/$FILE.qualDelta.comp.log 2>&1
+SEQ="--seq"
+/usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t $T -r $GENOME $SEQ # > $DIR/$FILE.qualDelta.comp.log 2>&1
 # /usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t 10 -r $GENOME # > $DIR/$FILE.seq_comp.log 2>&1
 # ls -l $DIR/$FILE.*
 # time plzip -vf $DIR/$FILE.k\=* 2> $DIR/$FILE.plzip

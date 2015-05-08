@@ -6,7 +6,7 @@ if [ ! -e $EXE ]; then
     exit
 fi
 
-# ./so_plzip.sh
+./so_plzip.sh
 
 export LD_LIBRARY_PATH=plzip:$LD_LIBRARY_PATH
 export DYLD_LIBRARY_PATH=plzip:$DYLD_LIBRARY_PATH
@@ -23,12 +23,14 @@ DIR="/mnt/scratch0/dfilippo/aligned"
 
 # samfiles=("P_aeruginosa_PAO1" "SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2")
 # samfiles=("SRR1294122" "SRR445718" "P_aeruginosa_PAO1")
-samfiles=("SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2")
+samfiles=("SRR445718" "SRR1294122" "P_aeruginosa_PAO1" "K562_cytosol_LID8465_TopHat_v2" "NA12878_S1")
 #samfiles=("SRR1294122")
 #samfiles=("MiSeq_Ecoli_DH10B_110721_PF")
 #samfiles=("P_aeruginosa_PAO1.10mil")
 #GENOME=NC_002516.fna
-GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
+HUMAN=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
+PAERUG=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_002516.fna
+genomes=($HUMAN $HUMAN $PAERUG $HUMAN $HUMAN)
 for ((i=0; i < ${#samfiles[@]}; i++))
 do
 	echo $i
@@ -41,6 +43,12 @@ do
 	#fi
 
 	FILE=${samfiles[$i]}
+	GENOME=${genomes[$i]}
+	echo $FILE, $GENOME
+
+	# ls -l $DIR/$FILE.sam.[oefilrhmk]*.lz
+	rm -f $DIR/$FILE.sam.[oefilrhmk]*.lz
+
 	SRC=$DIR/$FILE.sam
 	rm -f $DIR/$FILE.sam.k\=[0-9].*
 	OUT=$DIR/$FILE
