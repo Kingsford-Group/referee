@@ -454,7 +454,11 @@ private:
 	bool printed_warning = false;
 	void processUnalignedRead(IOLibAlignment & al) {
 		// save for later
-		cerr << "Read name: " << al.read_name_len() << endl;
+		// cerr << "Read name: " << al.read_name_len() << endl;
+		// vector<uint8_t> seq = al.getSeq();
+
+		// pick seq or its reverse complement depending of which one is "smaller"
+
 		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), al.getSeq(), al.quals());
 		// TODO: 10K - arbitrary parameter, may be as big or as small as one wants
 		if (unaligned_reads.size() >= 10000) {
@@ -564,6 +568,7 @@ private:
 
 	    if (!aligned_seq_only && !unique_seq_only)
 	    	handleReadNames(al);
+
 	    bool hasEdits = handleEdits(al);
 	    if (al.isRejected()) {
 	    	return true;
