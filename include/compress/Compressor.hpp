@@ -446,22 +446,36 @@ private:
 	////////////////////////////////////////////////////////////////
 	void handleOptionalFields(IOLibAlignment & al) {
 		// opt_stream << al.opt_fields() << endl;
+		string opt = al.opt_fields();
+		writeOpt(opt, out_buffers.opt_buf);
 	}
 
 	////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
 	bool printed_warning = false;
+	int used_rc = 0;
 	void processUnalignedRead(IOLibAlignment & al) {
 		// save for later
 		// cerr << "Read name: " << al.read_name_len() << endl;
-		// vector<uint8_t> seq = al.getSeq();
 
-		// pick seq or its reverse complement depending of which one is "smaller"
-
-		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), al.getSeq(), al.quals());
+		// consider read's RC -- if it has a smaller minimizer, then pick RC
+		vector<uint8_t> seq = al.getSeq();
+		auto minimizer = getMinimizer(seq, 12);
+		auto r_seq = reverse_complement(seq);
+		auto r_min = getMinimizer(r_seq, 12);
+		// pick the smaller one
+		bool rc = false;
+		if ( minimizer.compare(r_min) > 0 ) {
+			rc = true; 
+			// cerr << "Using rc";
+			used_rc++;
+			seq = r_seq;
+		}
+		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), seq, al.quals(), rc);
 		// TODO: 10K - arbitrary parameter, may be as big or as small as one wants
 		if (unaligned_reads.size() >= 10000) {
+			cerr << "Used rc " << used_rc << " ";
 			flushUnalignedReads();
 		}
 	}

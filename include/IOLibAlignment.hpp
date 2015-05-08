@@ -69,12 +69,14 @@ struct UnalignedRead {
 	vector<uint8_t> qual;
 	vector<uint8_t> read_name;
 
-	UnalignedRead(char * rn, int name_len, vector<uint8_t> s, char * q): seq(s) {
+	UnalignedRead(char * rn, int name_len, vector<uint8_t> s, char * q, bool rc = false): seq(s) {
 		for (auto i = 0; i < name_len; i++)
 			read_name.push_back(rn[i]);
 		auto q_len = s.size();
 		for (auto i = 0; i < q_len; i++)
 			qual.push_back(q[i] + '!');
+		if (rc)
+			reverse( qual.begin(), qual.end() );
 	}
 };
 
@@ -147,12 +149,34 @@ public:
 
 	////////////////////////////////////////////////////////////////
 	// w/o MD string
-	char * opt_fields() { 
-		auto auxillary_fields = bam_aux(read);
+	string opt_fields() { 
+		// auto auxillary_fields = bam_aux(read);
 		// TODO
 		// return bam_qual(read); 
 		// return opt_fields;
-		return auxillary_fields;
+		char *iter_handle;
+		char *key;
+		char type;
+		bam_aux_t val;
+		char k3[3];
+		string flags = "";
+		// cerr << "Calling iter ";
+		iter_handle = NULL;
+		while (0 == bam_aux_iter(read, &iter_handle, k3, &type, &val) ) {
+			// cerr << "called ";
+			if (k3[0] == 'M' and k3[1] == 'D') { // skip
+				// cerr << "md flag";
+			}
+			else {
+				flags.push_back(k3[0]);
+				flags.push_back(k3[1]);
+				// push value
+				flags += to_string(val.i);
+				flags.push_back(' ');
+				cerr << flags << " ";
+			}
+		}
+		return flags;
 	}
 
 	int lsc() { return left_soft_clip;}

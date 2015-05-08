@@ -104,6 +104,7 @@ public:
 		total_vectors++;
 		string deltas = "";
 		if (mode >= '!') {
+			// cerr << "Delta on quals!" << endl;
 			// transform core into a string of deltas to the mode
 			int prev_pos = 0;
 			for (int i = 0; i < core.size(); i++) {
@@ -118,6 +119,7 @@ public:
 					prev_pos = i;
 				}
 			}
+			// cerr << deltas << endl;
 		}
 		else {
 			deltas = core;

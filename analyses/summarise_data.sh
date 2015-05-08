@@ -2,8 +2,9 @@ DIR=/mnt/scratch0/dfilippo/aligned
 BIN=./bin/rsupport
 OUTPUT=data_summary.log
 rm -f $OUTPUT
-for file in SRR445718 SRR1294122 P_aeruginosa_PAO1 K562_cytosol_LID8465_TopHat_v2 # NA12878_S1
+for file in SRR445718 SRR1294122 P_aeruginosa_PAO1 K562_cytosol_LID8465_TopHat_v2 NA12878_S1
 do
+	echo $file
 	plzip -df -n 10 $DIR/$file.sam.edits.lz
 	plzip -df -n 10 $DIR/$file.sam.has_edits.lz
 	echo "=== $file" >> $OUTPUT
