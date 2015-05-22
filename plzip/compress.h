@@ -112,7 +112,8 @@ public:
     xunlock( &omutex );
     }
 
-  // deliver packets to muxer
+  // deliver packets to muxer. 
+  // sorts?
   void deliver_packets( std::vector< const Packet * > & packet_vector )
     {
     xlock( &omutex );

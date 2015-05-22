@@ -21,6 +21,7 @@ int range = 'z' - '!' + 1;
 // 5mers would require int64_t
 int r_base[] = {range*range*range, range*range, range, 1};
 
+////////////////////////////////////////////////////////////////
 unordered_map<int, int> countKmers(string const & q_v, int const K) {
 	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
 	unordered_map<int, int> kmers;
@@ -45,13 +46,36 @@ unordered_map<int, int> countKmers(string const & q_v, int const K) {
 //
 ////////////////////////////////////////////////////////////////
 class QualityCluster {
+///////////////////////////////////////
+private:
+	Packet_courier * courier;
+	char mode = 0;
+	bool is_pile = false;
+	int cluster_id = -1;
+	size_t total_vectors = 0;
+	string profile;
+	shared_ptr<unordered_map<int, int>> profile_kmers;
+	vector<string> data;
+	vector<string> prefices;
+	vector<string> suffices;
+	vector<int> ids;	// a vector of qual IDs -- its index in the original SAM file
+
+	shared_ptr<OutputBuffer> output_str;
+	shared_ptr<OutputBuffer> prefix_str;
+	shared_ptr<OutputBuffer> suffix_str;
+
+///////////////////////////////////////
 public:
 
 	QualityCluster(Packet_courier * c, bool p = false): courier(c), is_pile(p) {}
 
-	QualityCluster(Packet_courier * c, string & profile, int K, char m, bool p = false): courier(c), is_pile(p), mode(m) {
+	QualityCluster(Packet_courier * c, string & profile, int K, char m, bool p = false): 
+		courier(c), 
+		is_pile(p), 
+		mode(m) {
 		this->profile = profile;
 		// build profile kmers
+		// store them within the class instead of recomputing every time
 		auto kmers = countKmers(profile, K);
 		profile_kmers = make_shared<unordered_map<int,int>>( kmers );
 	}
@@ -70,7 +94,9 @@ public:
 
 	int size () {return data.size(); }
 
+	////////////////////////////////////////////////////////////////
 	// add string's core, pref, suffix
+	////////////////////////////////////////////////////////////////
 	void add(string & q_v, int id, string & prefix, string & suffix) {
 		total_vectors++;
 		data.push_back(q_v);
@@ -79,7 +105,9 @@ public:
 		suffices.push_back(suffix);
 	}
 
+	////////////////////////////////////////////////////////////////
 	// add string as is, w/o breaking it into core, pref and suff
+	////////////////////////////////////////////////////////////////
 	void add(string & q_v, int id) {
 		total_vectors++;
 		data.push_back(q_v);
@@ -100,7 +128,7 @@ public:
 	# 		edit_str += symbol
 	# 		prev_pos = i
 	*/
-	void writeCore(string const & core) {
+	void writeCore(string const & core, GenomicCoordinate & currentCoord) {
 		total_vectors++;
 		string deltas = "";
 		if (mode >= '!') {
@@ -124,17 +152,17 @@ public:
 		else {
 			deltas = core;
 		}
-		writeString(deltas, output_str);
+		writeString(deltas, output_str, currentCoord);
 	}
 
 	////////////////////////////////////////////////////////////////
-	void writePrefix(string & p) {
-		writeString(p, prefix_str);
+	void writePrefix(string & p, GenomicCoordinate & currentCoord) {
+		writeString(p, prefix_str, currentCoord);
 	}
 
 	////////////////////////////////////////////////////////////////
-	void writeSuffix(string & s) {
-		writeString(s, suffix_str);
+	void writeSuffix(string & s, GenomicCoordinate & currentCoord) {
+		writeString(s, suffix_str, currentCoord);
 	}
 
 	void flush() {
@@ -147,11 +175,13 @@ public:
 
 	////////////////////////////////////////////////////////////////
 	void flushBootstrapData() {
+		// TODO: keep track of the gneomic coordinates
+		GenomicCoordinate gc;
 		for (int j = 0; j < data.size(); j++) {
-			writeCore(data[j]);
+			writeCore(data[j], gc);
 			if (!is_pile) {
-				writePrefix(prefices[j]);
-				writeSuffix(suffices[j]);
+				writePrefix(prefices[j], gc);
+				writeSuffix(suffices[j], gc);
 			}
 			// else: prefix and suffix are not filled out
 		}
@@ -197,17 +227,21 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////
-	void openOutputStream(string & fname, int K_c) {
+	void openOutputStream(string & fname, shared_ptr<ofstream> genomic_coords_out, int K_c) {
 		string fname_prefix = fname + ".k=" + to_string(K_c);
 		// TODO: set dictionary size, match len parameters
 		if (cluster_id < 0 || is_pile) {
-			output_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (fname_prefix + ".other.lz").c_str() ) );
+			output_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
+				genomic_coords_out, fname_prefix, ".other.lz" ) );
 		}
 		else {
-			output_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (fname_prefix + "." + to_string(cluster_id) + ".lz" ).c_str() ) );
+			output_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
+				genomic_coords_out, fname_prefix, "." + to_string(cluster_id) + ".lz" ) );
 			// prefices, suffices
-			prefix_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (fname_prefix + "." + to_string(cluster_id) + ".prefix.lz").c_str() ) );
-			suffix_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (fname_prefix + "." + to_string(cluster_id) + ".suffix.lz").c_str() ) );
+			prefix_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
+				genomic_coords_out, fname_prefix, "." + to_string(cluster_id) + ".prefix.lz" ) );
+			suffix_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
+				genomic_coords_out, fname_prefix, "." + to_string(cluster_id) + ".suffix.lz" ) );
 		}
 	}
 
@@ -217,24 +251,6 @@ public:
 		if (prefix_str != nullptr) prefix_str->flush();
 		if (suffix_str != nullptr) suffix_str->flush();
 	}
-
-private:
-	Packet_courier * courier;
-	char mode = 0;
-	bool is_pile = false;
-	int cluster_id = -1;
-	size_t total_vectors = 0;
-	string profile;
-	shared_ptr<unordered_map<int, int>> profile_kmers;
-	vector<string> data;
-	vector<string> prefices;
-	vector<string> suffices;
-	vector<int> ids;
-
-	shared_ptr<OutputBuffer> output_str;
-	shared_ptr<OutputBuffer> prefix_str;
-	shared_ptr<OutputBuffer> suffix_str;
-
 };
 
 #endif

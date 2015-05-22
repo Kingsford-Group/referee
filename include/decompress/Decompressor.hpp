@@ -21,6 +21,27 @@
 #include "TranscriptsStream.hpp"
 
 
+
+
+////////////////////////////////////////////////////////////////
+//
+////////////////////////////////////////////////////////////////
+struct InputStreams {
+	shared_ptr<ClipStream> left_clips;
+	shared_ptr<ClipStream> right_clips;
+	shared_ptr<OffsetsStream> offs;
+	shared_ptr<EditsStream> edits;
+
+	shared_ptr<FlagsStream> flags;
+	shared_ptr<ReadIDStream> readIDs;
+	shared_ptr<QualityStream> qualities;
+
+	InputStreams() {}
+};
+
+
+
+
 char reverseReplace(uint8_t & c) {
         if (c == 'V') return 'N';
         if (c == 'W') return 'A';
@@ -42,40 +63,39 @@ class Decompressor {
 ////////////////////////////////////////////////////////////////
 public:
 
-	Decompressor(string const & input_fname, 
+	Decompressor(
 		string const & output_fname,
 		string const & ref_path):
-		file_name(input_fname),
 		output_name(output_fname),
 		ref_path(ref_path) { }
 
 	////////////////////////////////////////////////////////////////
 	// Reconstruct SAM file by combining the inputs; restoring reads and quals
 	////////////////////////////////////////////////////////////////
-	void decompress() {
+	void decompress(InputStreams & is, bool & done) {
 		// sequence-specific streams
-		OffsetsStream offs(file_name);
-		EditsStream edits(file_name);
-		ClipStream left_clips(file_name, ".left_clip" );
-		ClipStream right_clips(file_name, ".right_clip" );
+		// OffsetsStream offs(file_name);
+		// EditsStream edits(file_name);
+		// ClipStream left_clips(file_name, ".left_clip" );
+		// ClipStream right_clips(file_name, ".right_clip" );
 
-		read_len = edits.getReadLen();
+		read_len = is.edits->getReadLen();
 		cerr << "Read length:\t" << (int)read_len << endl;
 		TranscriptsStream transcripts(file_name, ref_path, "-d");
 		recovered_file.open( output_name.c_str() );
 		// TODO: check if opened successfully
 
 		// other streams
-		ReadIDStream readIDs(file_name);
-		FlagsStream flags(file_name/*, transcripts*/);
-		QualityStream qualities(file_name, /* K_c */ 4); // TODO: a parameter
+		// ReadIDStream readIDs(file_name);
+		// FlagsStream flags(file_name/*, transcripts*/);
+		// QualityStream qualities(file_name, /* K_c */ 4); // TODO: a parameter
 
-		int ref_id = offs.getNextTranscript();
+		int ref_id = is.offs->getNextTranscript();
 		int i = 0;
-		while ( offs.hasMoreOffsets() ) {
-			int offset = offs.getNextOffset();
+		while ( is.offs->hasMoreOffsets() || !done) {
+			int offset = is.offs->getNextOffset();
 			if (offset == END_OF_TRANS) {
-				ref_id = offs.getNextTranscript();
+				ref_id = is.offs->getNextTranscript();
 				if (ref_id == END_OF_STREAM) {
 					cerr << "Done" << endl;
 					return;
@@ -88,19 +108,21 @@ public:
 			}
 			else {
 				// legit offset
-				int ret = edits.next(); // advance to the next alignment
+				int ret = is.edits->next(); // advance to the next alignment
 				if (ret == END_OF_STREAM) {
 					cerr << "done with edits" << endl;
 					// break;
 				}
 				// cerr << "has edit: " << edits.hasEdits() << endl;
-				if (edits.hasEdits() ) {
+				if (is.edits->hasEdits() ) {
 					// extract edits
-					vector<uint8_t> edit_ops = edits.getEdits();
-					reconstructAlignment(offset, read_len, ref_id, transcripts, edit_ops, left_clips, right_clips, readIDs, flags, qualities); // TODO: add right and left clips
+					vector<uint8_t> edit_ops = is.edits->getEdits();
+					reconstructAlignment(offset, read_len, ref_id, transcripts, 
+						edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities); // TODO: add right and left clips
 				}
 				else {
-					reconstructAlignment(offset, ref_id, transcripts, readIDs, flags, qualities);
+					reconstructAlignment(offset, ref_id, transcripts, is.readIDs, 
+						is.flags, is.qualities);
 				}
 			}
 			i++;
@@ -135,9 +157,9 @@ private:
 	// TODO: fill out a iolib staden BAM record and write to a bam format
 	////////////////////////////////////////////////////////////////
 	void reconstructAlignment(int offset, int ref_id, TranscriptsStream & transcripts,
-			ReadIDStream & read_ids,
-			FlagsStream & flags,
-			QualityStream & qualities) {
+			shared_ptr<ReadIDStream> read_ids,
+			shared_ptr<FlagsStream> flags,
+			shared_ptr<QualityStream> qualities) {
 		// TODO
 //		string read_id;
 //		if ( read_ids.getNextID(read_id) != SUCCESS) {
@@ -177,11 +199,11 @@ private:
 	void reconstructAlignment(int offset, int read_len, int ref_id,
 			TranscriptsStream & transcripts,
 			vector<uint8_t> & edits,
-			ClipStream & left_clips,
-			ClipStream & right_clips,
-			ReadIDStream & read_ids,
-			FlagsStream & flags,
-			QualityStream & qualities) {
+			shared_ptr<ClipStream> left_clips,
+			shared_ptr<ClipStream> right_clips,
+			shared_ptr<ReadIDStream> read_ids,
+			shared_ptr<FlagsStream> flags,
+			shared_ptr<QualityStream> qualities) {
 		// get read ID for this alignment
 /*
 		string read_id;
@@ -217,9 +239,13 @@ private:
 	////////////////////////////////////////////////////////////////
 	// build CIGAR, MD strings for the read with edits
 	////////////////////////////////////////////////////////////////
-	string buildEditStrings(int read_len, vector<uint8_t> & edits, string & cigar, string & md_string, ClipStream & left_clips,
-			ClipStream & right_clips,
-			int offset, int ref_id, TranscriptsStream & transcripts) {
+	string buildEditStrings(int read_len, vector<uint8_t> & edits, 
+		string & cigar, string & md_string, 
+		shared_ptr<ClipStream> left_clips,
+		shared_ptr<ClipStream> right_clips,
+		int offset, int ref_id, 
+		TranscriptsStream & transcripts) {
+
 		string right_cigar, right_clip, read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
 		// cerr << "Read before edits: " << read << endl;
 		int j = 0, last_md_edit_pos = 0, last_cigar_edit_pos = 0, clipped_read_len = read_len;
@@ -236,7 +262,7 @@ private:
 			switch (op) {
 				case 'L': {
 					string left_clip;
-					left_clips.getNext(left_clip);
+					left_clips->getNext(left_clip);
 					// just concatenate the left clip and the read
 					read = left_clip + read.substr(0, read_len - left_clip.length());
 					// update cigar string
@@ -252,7 +278,7 @@ private:
 				}
 				break;
 				case 'R': {
-					right_clips.getNext(right_clip);
+					right_clips->getNext(right_clip);
 					right_cigar += to_string(right_clip.length());
 					right_cigar += "S";
 					clipped_read_len -= right_clip.length();

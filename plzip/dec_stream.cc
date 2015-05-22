@@ -62,8 +62,8 @@ private:
   int receive_worker_id;	// worker queue currently receiving packets
   int deliver_worker_id;	// worker queue currently delivering packets
   Slot_tally slot_tally;		// limits the number of input packets
-  std::vector< std::queue< Packet * > > ipacket_queues;
-  std::vector< std::queue< Packet * > > opacket_queues;
+  std::vector< std::queue< Packet * > > ipacket_queues;   // input packets queue
+  std::vector< std::queue< Packet * > > opacket_queues;   // output packets queue
   int num_working;			// number of workers still running
   const int num_workers;		// number of workers
   const int num_slots;			// max output packets in circulation
@@ -144,7 +144,7 @@ public:
     return ipacket;
     }
 
-  // collect a packet from a worker
+  // collect a packet from a decompression worker
   void collect_packet( Packet * const opacket, const int worker_id )
     {
     xlock( &omutex );
@@ -365,6 +365,7 @@ struct Worker_arg
     {
     const Packet * const ipacket = courier.distribute_packet( worker_id );
     if( !ipacket ) break;		// no more packets to process
+    // if no data -- finish decompression
     if( !ipacket->data ) LZ_decompress_finish( decoder );
 
     int written = 0;
@@ -372,6 +373,7 @@ struct Worker_arg
       {
       if( LZ_decompress_write_size( decoder ) > 0 && written < ipacket->size )
         {
+          // copy data to the internal buffer for decompression
         const int wr = LZ_decompress_write( decoder, ipacket->data + written,
                                             ipacket->size - written );
         if( wr < 0 ) internal_error( "library error (LZ_decompress_write)" );

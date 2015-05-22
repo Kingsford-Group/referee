@@ -19,9 +19,12 @@
 #define INT64_MAX  0x7FFFFFFFFFFFFFFFLL
 #endif
 
-
-class Block
-  {
+////////////////////////////////////////////////////////
+//
+//
+//
+////////////////////////////////////////////////////////
+class Block {
   long long pos_, size_;		// pos + size <= INT64_MAX
 
 public:
@@ -37,19 +40,22 @@ public:
   bool overlaps( const Block & b ) const
     { return ( pos_ < b.end() && b.pos_ < end() ); }
   void shift( Block & b ) { ++size_; ++b.pos_; --b.size_; }
-  };
+};
 
 
-class File_index
-  {
-  struct Member
-    {
+////////////////////////////////////////////////////////
+//
+//
+//
+////////////////////////////////////////////////////////
+class File_index {
+  struct Member {
     Block dblock, mblock;		// data block, member block
 
     Member( const long long dp, const long long ds,
             const long long mp, const long long ms )
       : dblock( dp, ds ), mblock( mp, ms ) {}
-    };
+  };
 
   std::vector< Member > member_vector;
   std::string error_;

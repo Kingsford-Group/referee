@@ -43,11 +43,10 @@ namespace {
 enum { max_packet_size = 1 << 20 };
 
 
-struct Packet			// data block
-  {
+struct Packet	{	// data block
   uint8_t * data;		// data == 0 means end of member
   int size;			// number of bytes in data (if any)
-  };
+};
 
 
 class Packet_courier			// moves packets around
@@ -215,8 +214,8 @@ extern "C" void * dworker_o( void * arg )
             opacket->data = new_data;
             opacket->size = new_pos;
             courier.collect_packet( opacket, worker_id );
-            new_pos = 0;
-            new_data = new( std::nothrow ) uint8_t[max_packet_size];
+            new_pos = 0;  // reset new_pos
+            new_data = new( std::nothrow ) uint8_t[max_packet_size];  // allocate new_data for the next piece of raw data
             if( !new_data ) { pp( "Not enough memory" ); cleanup_and_fail(); }
             }
           if( LZ_decompress_finished( decoder ) == 1 )
@@ -298,6 +297,7 @@ int dec_stdout( const int num_workers, const int infd, const int outfd,
 
   muxer( courier, pp, outfd );
 
+  // join
   for( int i = num_workers - 1; i >= 0; --i )
     {
     const int errcode = pthread_join( worker_threads[i], 0 );

@@ -15,8 +15,8 @@ struct Parser_args {
 	string ref_file_name;
 	int num_parsing_threads;
 	Packet_courier * courier;
-	bool aligned_seq_only;
-	bool unique_seq_only;
+	bool seq_only;
+	bool discard_secondary_alignments;
 };
 
 ////////////////////////////////////////////////////////////////
@@ -27,7 +27,8 @@ void * parseSAM( void * pa) {
 	Packet_courier * courier = tmp.courier;
 	Output_args outs = tmp.output;
 	// will write out a BAM/SAM header
-	Compressor c(tmp.file_name, tmp.ref_file_name, tmp.num_parsing_threads, outs, tmp.aligned_seq_only, tmp.unique_seq_only);
+	Compressor c(tmp.file_name, tmp.ref_file_name, tmp.num_parsing_threads, outs, 
+			tmp.seq_only, tmp.discard_secondary_alignments);
 	if (c.failed() ) {
 		cerr << "[INFO] Terminating. " << endl;
 		courier->finish();
@@ -35,8 +36,9 @@ void * parseSAM( void * pa) {
 	else {
 		auto start_time = chrono::system_clock::now();
 		c.compress();
+		// finished parsing SAM -- might have data remaining in the buffers
 		auto end_time = chrono::system_clock::now();
-		cerr << "Parsing wall time: " << chrono::duration_cast<chrono::microseconds>(end_time - start_time).count() << "us" << endl;
+		cerr << "Parsing wall time: " << chrono::duration_cast<chrono::microseconds>(end_time - start_time).count() << " us" << endl;
 		// flush all output buffers (get rid of remaining packets)
 		outs.flush();
 		auto flush_time = chrono::system_clock::now();
@@ -48,26 +50,31 @@ void * parseSAM( void * pa) {
 };
 
 ////////////////////////////////////////////////////////////////
-Output_args initializeOutputStreams(string & name_prefix, bool aligned_seq_only, bool unique_seq_only, Packet_courier * courier) {
-	Output_args oa;
-	oa.offsets_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".offs.lz").c_str(), 1<<22, 20) );
-	oa.edits_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".edits.lz").c_str() ) );
-	oa.left_clips_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".left_clip.lz").c_str(), 1<<22, 20) );
-	oa.right_clips_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".right_clip.lz").c_str(), 1<<22, 20) );
-	if (!aligned_seq_only && !unique_seq_only) {
-		oa.flags_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".flags.lz").c_str() ) );
-		oa.ids_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".ids.lz").c_str(), 3 << 20,  12 ) );
-		oa.opt_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".opt.lz").c_str() ) );
-		// oa.quals_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".quals.lz").c_str() ) );
-		oa.quals_buf = shared_ptr<QualityCompressor>(new QualityCompressor(courier, name_prefix.c_str(), 0.05, 200000, 4 ) );
+Output_args initializeOutputStreams(string & name_prefix, bool seq_only, 
+		bool discard_secondary_alignments, Packet_courier * courier) {
+	shared_ptr<ofstream> intervals(new ofstream("genomic_intervals.txt"));
+	Output_args oa(seq_only);
+	oa.offsets_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".offs.lz", 1<<22, 20) );
+	oa.edits_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".edits.lz" ) );
+	oa.left_clips_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".left_clip.lz", 1<<22, 20) );
+	oa.right_clips_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".right_clip.lz", 1<<22, 20) );
+	oa.unaligned_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, name_prefix, ".unaligned.lz" ) );
+	
+	if (!seq_only) {
+		oa.flags_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".flags.lz" ) );
+		oa.ids_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".ids.lz", 3 << 20,  12 ) );
+		oa.opt_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".opt.lz" ) );
+		// oa.quals_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, (name_prefix + ".quals.lz").c_str() ) );
+		oa.quals_buf = shared_ptr<QualityCompressor>(new QualityCompressor(courier, intervals, name_prefix.c_str(), 0.05, 200000, 4 ) );
 	}
-	oa.unaligned_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, (name_prefix + ".unaligned.lz").c_str() ) );
+	
 	
 	return oa;
 };
 
 ////////////////////////////////////////////////////////////////
-void compressFile(string & file_name, string const & ref_file_name, const int num_workers, bool aligned_seq_only, bool unique_seq_only) {
+void compressFile(string & file_name, string const & ref_file_name, const int num_workers, 
+	bool seq_only, bool discard_secondary_alignments) {
 	int dictionary_size = 1<<23;
 	int match_len_limit = 36; // equivalent to -6 option
 
@@ -79,7 +86,7 @@ void compressFile(string & file_name, string const & ref_file_name, const int nu
     Packet_courier courier(num_workers, num_slots);
 
 	// open output streams
-	Output_args output_args = initializeOutputStreams(file_name, aligned_seq_only, unique_seq_only, &courier);
+	Output_args output_args = initializeOutputStreams(file_name, seq_only, discard_secondary_alignments, &courier);
 
 	// from plzip library implementation
 	// initialize parsing thread -- pass courier, FDs for output
@@ -88,12 +95,12 @@ void compressFile(string & file_name, string const & ref_file_name, const int nu
 	parser_args.file_name = file_name;
 	parser_args.ref_file_name = ref_file_name;
 	parser_args.courier = &courier;
-	parser_args.aligned_seq_only = aligned_seq_only;
-	parser_args.unique_seq_only = unique_seq_only;
+	parser_args.seq_only = seq_only;
+	parser_args.discard_secondary_alignments = discard_secondary_alignments;
 
 	pthread_t * parser_thread = new pthread_t();
 	int errcode = pthread_create( parser_thread, 0, parseSAM, &parser_args );
-	if( errcode ) { 
+	if ( errcode ) { 
 		show_error( "Can't create parser thread", errcode ); cleanup_and_fail(); 
 	}
 

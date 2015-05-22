@@ -7,9 +7,11 @@
 
 class OffsetsStream {
 public:
-	OffsetsStream(string & file_name) {
-		offsets_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".offs") );
-	}
+	// OffsetsStream(string & file_name) {
+	// 	offsets_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".offs") );
+	// }
+
+	OffsetsStream(shared_ptr<InputBuffer> ib): offsets_in(ib) { }
 
 	bool hasMoreOffsets() {
 		if (!offsets_in->hasMoreBytes() ) return false;
