@@ -21,16 +21,16 @@ DIR="/mnt/scratch0/dfilippo/aligned"
 # DIR="/data/referee/aligned"
 # SEQMODE="--seq"
 
-# samfiles=("P_aeruginosa_PAO1" "SRR1294122" "SRR445718" "K562_cytosol_LID8465_TopHat_v2")
+samfiles=("P_aeruginosa_PAO1" "K562_cytosol_LID8465_TopHat_v2" "NA12878_S1")
 # samfiles=("SRR1294122" "SRR445718" "P_aeruginosa_PAO1")
-samfiles=("SRR445718" "SRR1294122" "P_aeruginosa_PAO1" "K562_cytosol_LID8465_TopHat_v2" "NA12878_S1")
+# samfiles=("SRR445718" "SRR1294122" "P_aeruginosa_PAO1" "K562_cytosol_LID8465_TopHat_v2" "NA12878_S1")
 #samfiles=("SRR1294122")
 #samfiles=("MiSeq_Ecoli_DH10B_110721_PF")
 #samfiles=("P_aeruginosa_PAO1.10mil")
 #GENOME=NC_002516.fna
 HUMAN=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
 PAERUG=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_002516.fna
-genomes=($HUMAN $HUMAN $PAERUG $HUMAN $HUMAN)
+genomes=($PAERUG $HUMAN $HUMAN $HUMAN $HUMAN)
 for ((i=0; i < ${#samfiles[@]}; i++))
 do
 	echo $i

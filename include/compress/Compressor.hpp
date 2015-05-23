@@ -447,12 +447,15 @@ private:
 	void handleOptionalFields(IOLibAlignment & al) {
 		// find MD and excise it
 		// opt_stream << al.opt_fields() << endl;
+		string opt = al.opt_fields();
+		writeOpt(opt, out_buffers.opt_buf);
 	}
 
 	////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
 	bool printed_warning = false;
+	int used_rc = 0;
 	void processUnalignedRead(IOLibAlignment & al) {
 		// save for later
 		// cerr << "Read name: " << al.read_name_len() << endl;
@@ -463,23 +466,17 @@ private:
 		auto r_seq = reverse_complement(seq);
 		auto r_min = getMinimizer(r_seq, 12);
 		// pick the smaller one
-		if ( minimizer.compare(r_min) > 0 ) seq = r_seq;
-/*		bool first_seq = false;
-		for (int i = 0; i < 12; i++) {
-			if (minimizer[i] < r_min[i]) {
-				first_seq = true;
-				break;
-			}
-			else if (minimizer[i] > r_min[i]) {
-				first_seq = false;
-				break;
-			}
+		bool rc = false;
+		if ( minimizer.compare(r_min) > 0 ) {
+			rc = true; 
+			// cerr << "Using rc";
+			used_rc++;
+			seq = r_seq;
 		}
-		if (!first_seq) seq = r_seq;
-*/
-		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), seq, al.quals());
+		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), seq, al.quals(), rc);
 		// TODO: 10K - arbitrary parameter, may be as big or as small as one wants
 		if (unaligned_reads.size() >= 10000) {
+			cerr << "Used rc " << used_rc << " ";
 			flushUnalignedReads();
 		}
 	}
@@ -586,6 +583,7 @@ private:
 
 	    if (!aligned_seq_only && !unique_seq_only)
 	    	handleReadNames(al);
+
 	    bool hasEdits = handleEdits(al);
 	    if (al.isRejected()) {
 	    	return true;

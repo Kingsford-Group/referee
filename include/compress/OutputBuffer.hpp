@@ -82,6 +82,8 @@ public:
 
 	friend void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, shared_ptr<OutputBuffer> o_str);
 
+	friend void writeOpt(string opt, shared_ptr<OutputBuffer> o_str);
+
 	friend void writeUnaligned(UnalignedRead & read, shared_ptr<OutputBuffer> o_str);
 
 	////////////////////////////////////////////////////////////////
@@ -234,6 +236,12 @@ void writeName(char * read_name, shared_ptr<OutputBuffer> o_str) {
 		o_str->data.push_back(read_name[i]);
 	o_str->data.push_back('\n');
 	if (o_str->timeToDump() ) o_str->compressAndWriteOut();
+}
+
+void writeOpt(string opt, shared_ptr<OutputBuffer> o_str) {
+	for (auto c : opt) o_str->data.push_back(c);
+	o_str->data.push_back('\n');
+	if (o_str->timeToDump()) o_str->compressAndWriteOut();
 }
 
 void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, shared_ptr<OutputBuffer> o_str) {
