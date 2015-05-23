@@ -36,7 +36,7 @@ TIMEOPT="-v"
 
 T=10
 # SEQ="--seq"
-/usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t $T -r $GENOME $SEQ # > $DIR/$FILE.qualDelta.comp.log 2>&1
+# /usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t $T -r $GENOME $SEQ # > $DIR/$FILE.qualDelta.comp.log 2>&1
 # ls -l $DIR/$FILE.*
 # time plzip -vf $DIR/$FILE.k\=* 2> $DIR/$FILE.plzip
 # python python/parse_plzip_output.py $DIR/$FILE.plzip
