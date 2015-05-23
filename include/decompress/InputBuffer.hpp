@@ -24,10 +24,10 @@ using namespace tbb;
 
 
 // chromosome/transcript ID -- an interger
-typedef int chromoID;
+typedef int chromo_id_t;
 
-
-
+#define chromo_min 0
+#define chromo_max 300000000
 
 ////////////////////////////////////////////////////////////////
 //
@@ -64,10 +64,14 @@ private:
 
 class MyBlock {
 public:
-	int size;	// block's size (including header and trailer)
-	int offset;	// offset to the block's header from the begining of the file
+	int compressed_size = -1;			// block's size (including header and trailer)
+	int decompressed_size = -1;	// expected size of the decompressed data
+	int offset = -1;			// offset to the block's header from the begining of the file
 
-	MyBlock(int s, int off): size(s), offset(off) {}
+	MyBlock(int s, int exp, int off): 
+		compressed_size(s), 
+		decompressed_size(exp), 
+		offset(off) {}
 };
 
 
@@ -78,6 +82,72 @@ public:
 //
 ////////////////////////////////////////////////////////////////
 class InputBuffer {
+
+	////////////////////////////////////////////////////////////////
+	void createChromosomeIntervalTree(int const chromoID,
+			shared_ptr<vector<TrueGenomicInterval>> genomic_intervals,
+			vector<MyBlock> & lzip_blocks,
+			vector<RawDataInterval> & leftovers,
+			int i, int prev_i) {
+		auto first_gi = genomic_intervals->at(prev_i);
+		auto last_gi = genomic_intervals->at(i - 1);
+		vector<RawDataInterval> chromosome_intervals;
+
+		// add leftovers to the vector
+		for (auto i : leftovers)
+			chromosome_intervals.push_back(i);
+		// chromosome_intervals.insert(leftovers.begin(), leftovers.end() );
+		leftovers.clear();
+		// 
+		for (auto j = 0; j < i - prev_i; j++) {
+			auto gi = genomic_intervals->at(prev_i + j);
+			auto block = lzip_blocks[prev_i + j];
+			// signature:
+			// RawDataInterval(size_t off, size_t size, size_t ex, int chr, int s, int e): 
+			if (gi.start.chromosome != gi.end.chromosome) {
+				// spans several chromosomes
+				auto chromo_span = gi.end.chromosome - gi.start.chromosome - 1;
+				chromosome_intervals.emplace_back(
+					block.offset, block.compressed_size, block.decompressed_size,
+					gi.start.chromosome, gi.start.offset, chromo_max);
+				chromosome_trees[gi.start.chromosome] = 
+					IntervalTree<int,int>(chromosome_intervals);
+
+				// start a new tree!
+				// add default spans for all chromosomes in between
+				int k = 0;
+				while (k < chromo_span) {
+					chromosome_intervals.clear();
+					chromosome_intervals.emplace_back(
+						block.offset, block.compressed_size, block.decompressed_size,
+						gi.start.chromosome + k + 1, chromo_min, chromo_max);
+					chromosome_trees[gi.start.chromosome + k + 1] = 
+						IntervalTree<int,int>(chromosome_intervals);
+					k++;
+				}
+				// technically, this is LEFTOVERS
+				// chromosome_intervals.clear();
+				leftovers.clear();
+				leftovers.emplace_back(
+					block.offset, block.compressed_size, block.decompressed_size,
+					gi.end.chromosome, chromo_min, gi.end.offset);
+				// return this interval at the end
+			}
+			else {
+				// contained within chromosome
+				chromosome_intervals.emplace_back(
+					block.offset, block.compressed_size, block.decompressed_size,
+					gi.start.chromosome, gi.start.offset, gi.end.offset );
+			}
+		}
+
+		if (last_gi.end.chromosome == first_gi.start.chromosome) {
+			chromosome_trees[chromoID] = IntervalTree<int,int>(chromosome_intervals);
+			chromosome_intervals.clear();
+		}
+		// return chromosome_intervals;
+	}
+
 public:
 	////////////////////////////////////////////////////////////////
 	// default constructor: acquires file descriptor for a data stream,
@@ -93,35 +163,28 @@ public:
 				cerr << "[INFO] Could not open file: " << fname << endl;
 			}
 
-		// TODO: need a bunch of interval trees -- one per chromosome, for example
-		// read from the begining of the file or from the reference file
-
+		// interval trees -- one per chromosome
 		// fill out chromosome_trees
-		// RawDataInterval
-		// IntervalTree tree;
 		auto lzip_blocks = seek_blocks(f_in);
-		int chromoID = -1;
-		for (int i = 0; i < genomic_intervals->size(); i++) {
+		int chromoID = genomic_intervals->at(0).start.chromosome;
+		int i, prev_i = 0;
+		vector<RawDataInterval> leftovers;
+		for (i = 1; i < genomic_intervals->size(); i++) {
 			auto interval = genomic_intervals->at(i);
-			auto block = lzip_blocks[i];
 			if (chromoID != interval.start.chromosome) {
-				// TODO new tree
-				chromoID = interval.start.chromosome;
-				// tree = new tree();
-
-				// auto chromo_span = interval.end.chromosome - interval.start.chromosome;
-				// int i = 0;
-				// while (i < chromo_span) {
-				// 	// interval spans over chromosomes
-				// 	i++;
-				// }
-				// tree.add(interval);
-				// chromosome_trees[chromoID] = tree;
-			}
-			else {
-				// TODO
+				// create new tree(s)
+				// genomic_intervals[prev_i, i-1];
+				createChromosomeIntervalTree(chromoID, genomic_intervals, lzip_blocks, leftovers, i, prev_i);
+				// update chromo ID
+				chromoID = interval.end.chromosome;
+				prev_i = i;
 			}
 		}
+		cerr << fname << " trees: " << chromosome_trees.size() << endl;
+		// process remaining intervals
+		// genomic_intervals[prev_i:]
+		createChromosomeIntervalTree(chromoID, genomic_intervals, lzip_blocks, leftovers, i, prev_i);
+
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -235,8 +298,8 @@ public:
 ////////////////////////////////////////////////////////////////
 private:
 
-	unordered_map<chromoID, IntervalTree<int,int> > chromosome_trees;
-	// unordered_map<chromoID, IntervalTree<int,vector<uint8_t> > > unzipped_data_trees;
+	unordered_map<chromo_id_t, IntervalTree<int,int> > chromosome_trees;
+	// unordered_map<chromo_id_t, IntervalTree<int,vector<uint8_t> > > unzipped_data_trees;
 
 	int buffer_id;
 
@@ -283,8 +346,9 @@ private:
 			f_in.read( (char *) trailer.data, File_trailer::size);
 			// block size
 			auto member_size = trailer.member_size();
+			auto data_size = trailer.data_size();
 			pos -= member_size;
-			blocks.emplace_back(member_size, pos);
+			blocks.emplace_back(member_size, data_size, pos);
 			f_in.seekg( -member_size, f_in.cur);
 		}
 		reverse( blocks.begin(), blocks.end() );

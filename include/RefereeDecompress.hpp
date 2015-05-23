@@ -26,7 +26,7 @@ using namespace tbb;
 // example 8
 ////////////////////////////////////////////////////////////////
 vector<uint8_t> unzipData(shared_ptr<vector<uint8_t>> raw_data, int const new_data_size) {
-	vector<uint8_t> unzipped_data(new_data_size, 0); // todo: allocate needed amount of bytes
+	vector<uint8_t> unzipped_data(new_data_size, 0); // allocate needed amount of bytes
 	// uint8_t * const ibuffer = new( std::nothrow ) uint8_t[buffer_size];
 
 	// prepare a decoder stream
