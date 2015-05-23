@@ -17,6 +17,7 @@
 // #include <lzip.h>
 // #include <compress.h>
 
+#include "IntervalTree.h"
 #include "IOLibParser.hpp"
 #include "IOLibAlignment.hpp"
 #include "OutputBuffer.hpp"
@@ -32,7 +33,12 @@
 //
 //
 ////////////////////////////////////////////////////////////////
-struct Output_args {
+class Output_args {
+	bool seq_only = false;
+public:
+	Output_args() {}
+	Output_args(bool s) : seq_only(s) {}
+
 	shared_ptr<OutputBuffer> offsets_buf;
 	shared_ptr<OutputBuffer> edits_buf;
 	shared_ptr<OutputBuffer> left_clips_buf;
@@ -45,19 +51,57 @@ struct Output_args {
 	shared_ptr<OutputBuffer> unaligned_buf;
 
 	void flush() {
-		if (flags_buf != nullptr)
-			flags_buf->flush();
+		// cerr << "flush 1 ";
 		offsets_buf->flush();
+		// cerr << "flush 2 ";
 		edits_buf->flush();
+		// cerr << "flush 3 ";
 		left_clips_buf->flush();
+		// cerr << "flush 4 ";
 		right_clips_buf->flush();
-		if (ids_buf != nullptr)
-			ids_buf->flush();
-		if (quals_buf != nullptr)
-			quals_buf->flush(); // causes individual clusters to flush their OutputBuffers; notify the courier
-		if (opt_buf != nullptr)
-			opt_buf->flush();
+		// cerr << "flush 5 ";
 		unaligned_buf->flush();
+		// cerr << "done w/ seq ";
+		if (!seq_only) {
+			// cerr << "flush 6 ";
+			flags_buf->flush();
+			// cerr << "flush 7 ";
+			ids_buf->flush();
+			// cerr << "flush 8 ";
+			quals_buf->flush(); // causes individual clusters to flush their OutputBuffers; notify the courier
+			// cerr << "flush 9 ";
+			opt_buf->flush();
+		}
+	}
+
+	void setInitialCoordinate(int chromo, int offset) {
+		offsets_buf->setInitialCoordinate(chromo, offset);
+		edits_buf->setInitialCoordinate(chromo, offset);
+		left_clips_buf->setInitialCoordinate(chromo, offset);
+		right_clips_buf->setInitialCoordinate(chromo, offset);
+
+		if (!seq_only) {
+			ids_buf->setInitialCoordinate(chromo, offset);
+			flags_buf->setInitialCoordinate(chromo, offset);
+			// TODO
+			// quals_buf->setInitialCoordinate(chromo, offset);
+			opt_buf->setInitialCoordinate(chromo, offset);
+		}
+	}
+
+	void setLastCoordinate(int chromo, int offset) {
+		offsets_buf->setLastCoordinate(chromo, offset);
+		edits_buf->setLastCoordinate(chromo, offset);
+		left_clips_buf->setLastCoordinate(chromo, offset);
+		right_clips_buf->setLastCoordinate(chromo, offset);
+
+		if (!seq_only) {
+			ids_buf->setLastCoordinate(chromo, offset);
+			flags_buf->setLastCoordinate(chromo, offset);
+			// TODO
+			// quals_buf->setLastCoordinate(chromo, offset);
+			opt_buf->setLastCoordinate(chromo, offset);
+		}
 	}
 };
 
@@ -68,13 +112,15 @@ public:
 	////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
-	Compressor (string const & file_name, string const & ref_file, int t, Output_args & output_buffers, bool aligned_seq_only, bool unique_seq_only):
+	Compressor (string const & file_name, string const & ref_file, int t, 
+			Output_args & output_buffers, 
+			bool seq_only, bool discard_secondary):
 		parser(file_name, t),
 		ref_seq_handler(file_name, ref_file, "-c"),
 		out_buffers(output_buffers),
 		file_name(file_name),
-		aligned_seq_only(aligned_seq_only),
-		unique_seq_only(unique_seq_only) {
+		seq_only(seq_only),
+		discard_secondary_alignments(discard_secondary) {
 		failed_ = parser.failed();
 		// TODO: check that successfully created a file parser
 	}
@@ -97,6 +143,7 @@ public:
 		head_out.close();
 
 		int line_id = 0;
+		IOLibAlignment last_aligned;
 	    while ( parser.read_next() ) {
 	        bam_seq_t* read = parser.getRead();
 	        IOLibAlignment al(read);
@@ -105,20 +152,23 @@ public:
 	            processUnalignedRead(al);
 	        }
 	        else {
+	        	last_aligned = al;
 	            processRead(al, first);
 	            first = false;
 	        }
 	        line_id++;
 	    }
+	    out_buffers.setLastCoordinate(last_aligned.ref(), last_aligned.offset());
 	    flushUnalignedReads();
 	    parser.close();
 	    cerr << "Of them unaligned: " << unaligned_cnt << endl;
-	    if (unique_seq_only)
+	    if (discard_secondary_alignments)
 	    	cerr << "Unique total reads: " << count << endl;
 
 	    cerr << "Total edits: " << edit_count << endl;
 
-	    outputPair(offset_pair);
+	    // output the last offset
+	    outputPair(offset_pair, prev_ref, prev_offset);
 	    processHasEditsBits(edit_flags, file_name);
 	}
 
@@ -133,9 +183,9 @@ private:
 
 	bool failed_ = false;
 
-	bool aligned_seq_only = false; // compress all aligned sequence, including the multimaps
+	bool seq_only = false; // compress all aligned sequence, including the multimaps
 
-	bool unique_seq_only = false;	// omit multimaps, record data for a given read only once
+	bool discard_secondary_alignments = false;	// omit multimaps, record data for a given read only once
 	// TODO: strategies for choosing the alignement: smallest errors, most consistent offsets
 
 	int count = 0;
@@ -169,31 +219,37 @@ private:
 
 	////////////////////////////////////////////////////////////////
 	void writeLeftClip(IOLibAlignment & al) {
+		if ( !al.isPrimary() && discard_secondary_alignments ) return;
+
 		auto clip_length = al.lsc();
 		auto clip_bytes = al.getLeftSoftClip();
 		// for 2 bit encoding
 		// lc_stream << clip_length; 
 		// for (auto i = 0; i < clip_length; i++) lc_stream << clip_bytes[i];
 		// lc_stream << endl;
-		writeClip(clip_bytes, clip_length, out_buffers.left_clips_buf);
+		GenomicCoordinate g(al.ref(), al.offset() );
+		writeClip(clip_bytes, clip_length, out_buffers.left_clips_buf, g);
 	}
 
 	////////////////////////////////////////////////////////////////
 	void writeRightClip(IOLibAlignment & al) {
+		if ( !al.isPrimary() && discard_secondary_alignments ) return;
+
 		auto clip_length = al.rsc();
 		auto clip_bytes = al.getRightSoftClip();
 		// for 2 bit encoding
 		// rc_stream << clip_length;
 		// for (auto i = 0; i < clip_length; i++) rc_stream << clip_bytes[i];
 		// rc_stream << endl;
-		writeClip(clip_bytes, clip_length, out_buffers.right_clips_buf);
+		GenomicCoordinate g(al.ref(), al.offset() );
+		writeClip(clip_bytes, clip_length, out_buffers.right_clips_buf, g);
 	}
 
 	////////////////////////////////////////////////////////////////
 	// write out edits to a compressed stream
 	////////////////////////////////////////////////////////////////
 	bool handleEdits(IOLibAlignment & al) {
-		if ( !al.isPrimary() && unique_seq_only ) return false;
+		if ( !al.isPrimary() && discard_secondary_alignments ) return false;
 
 		bool hasEdits = al.handleEdits(ref_seq_handler);
 		// TODO: if MD string is not available with the optional fields
@@ -253,7 +309,9 @@ private:
 		}
 		// cerr << " Edit len: " << (int)num_edit_bytes << endl;
 	    // edit_stream << (unsigned char)num_edit_bytes;
-	    addUnsignedByte(num_edit_bytes, out_buffers.edits_buf);
+	    GenomicCoordinate gc(al.ref(), al.offset() );
+
+	    addUnsignedByte(num_edit_bytes, out_buffers.edits_buf, gc);
 
 	    edit_count += al.merged_edits.size();
 
@@ -262,26 +320,27 @@ private:
 	    if (al.lsc() > 0) {
 	        // edit_stream << 'L';
 	        prev_edit_offset += al.lsc();
-	        addUnsignedByte('L', out_buffers.edits_buf);
+	        addUnsignedByte('L', out_buffers.edits_buf, gc);
 	        writeLeftClip(al);
 	    }
 	    if (al.rsc() > 0) {
 	        // edit_stream << 'R';
-	        addUnsignedByte('R', out_buffers.edits_buf);
+	        addUnsignedByte('R', out_buffers.edits_buf, gc);
 	        writeRightClip(al);
 	    }
 	    // if (al.lhc() > 0) edit_stream << 'l' << (unsigned char)al.lhc();
 	    // if (al.rhc() > 0) edit_stream << 'r' << (unsigned char)al.rhc();
 	    if (al.lhc() > 0) {
-		    addUnsignedByte('l', out_buffers.edits_buf);
-		    addUnsignedByte(al.lhc(), out_buffers.edits_buf);
+		    addUnsignedByte('l', out_buffers.edits_buf, gc);
+		    addUnsignedByte(al.lhc(), out_buffers.edits_buf, gc);
 		    prev_edit_offset += al.lhc();
 		}
 		if (al.rhc() > 0) {
-		    addUnsignedByte('r', out_buffers.edits_buf);
-		    addUnsignedByte(al.rhc(), out_buffers.edits_buf);
+		    addUnsignedByte('r', out_buffers.edits_buf, gc);
+		    addUnsignedByte(al.rhc(), out_buffers.edits_buf, gc);
 		}
 
+		
 		// cerr << al.offset() << " ";
 	    // write out all other edits
 	    if (al.merged_edits.size() > 0) {
@@ -289,7 +348,7 @@ private:
 	        	// cerr << (char) edit.edit_op << "(" << edit.edit_pos << ")";
 	            if (edit.edit_op != 'E') {
 	            	if (edit.edit_op != 'R' && edit.edit_op != 'L') {// these are handled separately
-	            		writeOp(edit, prev_edit_offset, out_buffers.edits_buf);
+	            		writeOp(edit, prev_edit_offset, out_buffers.edits_buf, gc);
 	                	// edit_stream << (unsigned char) edit.edit_op; // edit code            
 	                	// edit_stream << (unsigned char) (edit.edit_pos - prev_edit_offset);    // record how many bases since the last edit
 	                	prev_edit_offset = edit.edit_pos;
@@ -305,11 +364,11 @@ private:
 	                // cerr << "Splice offset: " << (int)(edit.edit_pos - prev_edit_offset) << " len: " << splice_len;
 	                if (splice_len > 65535 ) {
                 		// cerr << " (long splice)" << endl;
-                		writeLongSpliceOp(edit, prev_edit_offset, splice_len, out_buffers.edits_buf);
+                		writeLongSpliceOp(edit, prev_edit_offset, splice_len, out_buffers.edits_buf, gc);
 	                }
 	                else {
 	                	// cerr << " (short splice)" << endl;
-	                	writeSpliceOp(edit, prev_edit_offset, splice_len, out_buffers.edits_buf);
+	                	writeSpliceOp(edit, prev_edit_offset, splice_len, out_buffers.edits_buf, gc);
 	                }
 	                prev_edit_offset = edit.edit_pos;
 	            }
@@ -319,12 +378,14 @@ private:
 		return hasEdits;
 	}
 
-	void outputPair(pair<int,int> const & offset_pair) {
+	void outputPair(pair<int,int> const & offset_pair, int chromo_id, int real_offset) {
+		GenomicCoordinate gc(chromo_id, real_offset);
+
 		if (offset_pair.second > 1) {// offset with a multiplier
-    		addOffsetPair(offset_pair.first, offset_pair.second, out_buffers.offsets_buf);
+    		addOffsetPair(offset_pair.first, offset_pair.second, out_buffers.offsets_buf, gc);
 		}
 		else { // offset w/o a multiplier
-			addOffset(offset_pair.first, out_buffers.offsets_buf);
+			addOffset(offset_pair.first, out_buffers.offsets_buf, gc);
 		}
 	}
 
@@ -339,7 +400,8 @@ private:
 	////////////////////////////////////////////////////////////////
 	void handleOffsets(IOLibAlignment & al, bool hasEdits, bool first) {
 		// if only want to encode a single read once ever, will skip all secondary alignements
-		if ( !al.isPrimary() && unique_seq_only ) return;
+		if ( !al.isPrimary() && discard_secondary_alignments ) return;
+
 		count++;
 		int offset = al.offset();
 	    // same offset as before -- increment the counter
@@ -356,7 +418,7 @@ private:
 		    // }
 		    else {
 		    	// offset is different -- write prev to byte stream, store this new one
-		    	outputPair(offset_pair);
+		    	outputPair(offset_pair, al.ref(), al.offset() );
 		    	// reset the counter
 		    	offset_pair = make_pair(delta, 1);
 		    }
@@ -369,6 +431,8 @@ private:
 	// transform the flags before writing out
 	////////////////////////////////////////////////////////////////
 	void handleFlags(IOLibAlignment & al) {
+		if ( !al.isPrimary() && discard_secondary_alignments ) return;
+
 		// remap flags, mapq, and rnext to a smaller domain
 		short flags = al.flags();
 		int mapq = al.mapq(), rnext = al.rnext();
@@ -386,7 +450,9 @@ private:
 			rnext_map[flags] = rnext_i++; 	// insert and increment
 		}
 		rnext = rnext_map[rnext];
-		writeFlags(flags, mapq, rnext, al.pnext(), al.pnext() - al.tlen(), out_buffers.flags_buf);
+
+		GenomicCoordinate gc(al.ref(), al.offset());
+		writeFlags(flags, mapq, rnext, al.pnext(), al.pnext() - al.tlen(), out_buffers.flags_buf, gc);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -394,8 +460,11 @@ private:
 	// size_t unique_chunk_id = 0;
 	// string delimiters = ".:_\s#";
 	void handleReadNames(IOLibAlignment & al) {
+		if ( !al.isPrimary() && discard_secondary_alignments ) return;
+
 		// TODO: need to transform the read IDs before passing it down to the lzip
-		writeName(al.read_name(), out_buffers.ids_buf);
+		GenomicCoordinate gc(al.ref(), al.offset());
+		writeName(al.read_name(), out_buffers.ids_buf, gc);
 
 		// split, diff, minimize!
 		// this can make compression for read ids faster and provide marginal improvements
@@ -423,6 +492,8 @@ private:
 	// QualityCompressor qual_compressor;
 	////////////////////////////////////////////////////////////////
 	void handleQuals(IOLibAlignment & al) {
+		if ( !al.isPrimary() && discard_secondary_alignments ) return;
+
 		if (al.isPrimary()) {
 			// haven't seen the read before -- output the quals
 			auto len = al.read_len();
@@ -435,7 +506,8 @@ private:
 					q[len - i - 1] = temp;
 				}
 			}
-			out_buffers.quals_buf->handleRead(q, len);
+			GenomicCoordinate gc(al.ref(), al.offset());
+			out_buffers.quals_buf->handleRead(q, len, gc);
 			// qual_compressor.handleRead(q, len);
 
 			// just plzip
@@ -446,9 +518,11 @@ private:
 	////////////////////////////////////////////////////////////////
 	void handleOptionalFields(IOLibAlignment & al) {
 		// find MD and excise it
+		if ( !al.isPrimary() && discard_secondary_alignments ) return;
 		// opt_stream << al.opt_fields() << endl;
 		string opt = al.opt_fields();
-		writeOpt(opt, out_buffers.opt_buf);
+		GenomicCoordinate gc(al.ref(), al.offset());
+		writeOpt(opt, out_buffers.opt_buf, gc);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -559,37 +633,38 @@ private:
 	    bool rejected = false, new_transcript = false;
 	    // get reference sequence ID
 	    auto ref = al.ref();
-	    // if this is the first first alignments
+	    // if this is the first alignment
 	    if (first) {
 	    	cerr << "Assuming uniform read len of " << al.read_len() << " bases" << endl;
+	    	out_buffers.setInitialCoordinate(ref, al.offset() );
 	    	writeReadLen(al.read_len(), out_buffers.edits_buf);
 	    	// edit_stream << (uint8_t)al.read_len();
 	    	prev_ref = ref;
 
 	    	// write the reference id before writing out alignment offsets
-	    	addReference(prev_ref, first, out_buffers.offsets_buf);
+	    	GenomicCoordinate gc(ref, al.offset());
+	    	addReference(prev_ref, first, out_buffers.offsets_buf, gc);
 	    	new_transcript = true;
 	    }
 	    // starting a different chromosome -- finish the line, write out a new ref id
 	    else if (ref != prev_ref) {
-	    	outputPair(offset_pair);
+	    	outputPair(offset_pair, prev_ref, prev_offset);
 	    	offset_pair = make_pair(0,0);
 	    	prev_offset = 0;
 
-	    	addReference(ref, first, out_buffers.offsets_buf);
+	    	GenomicCoordinate gc(ref, al.offset());
+	    	addReference(ref, first, out_buffers.offsets_buf, gc);
 	    	prev_ref = ref;
 	    	new_transcript = true;
 	    }
-
-	    if (!aligned_seq_only && !unique_seq_only)
-	    	handleReadNames(al);
 
 	    bool hasEdits = handleEdits(al);
 	    if (al.isRejected()) {
 	    	return true;
 	    }
 	    handleOffsets(al, hasEdits, first || new_transcript);
-	    if (!aligned_seq_only && !unique_seq_only) {
+	    if (!seq_only) {
+	    	handleReadNames(al);
 	    	handleFlags(al);
 	    	handleQuals(al);
 	    	handleOptionalFields(al);

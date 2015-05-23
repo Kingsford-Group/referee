@@ -8,9 +8,11 @@
 
 class ClipStream {
 public:
-	ClipStream(string & file_name, char const * suffix) {
-		clips_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + suffix) );
-	}
+	// ClipStream(string & file_name, char const * suffix) {
+	// 	clips_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + suffix) );
+	// }
+
+	ClipStream(shared_ptr<InputBuffer> ib): clips_in(ib) {}
 
 	string peekNext() {
 		// cerr << "current_clip: " << current_clip;

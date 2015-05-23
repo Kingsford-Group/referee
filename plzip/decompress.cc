@@ -61,19 +61,19 @@ int preadblock( const int fd, uint8_t * const buf, const int size,
 // If (returned value < size), it is always an error.
 //
 int pwriteblock( const int fd, const uint8_t * const buf, const int size,
-                 const long long pos )
-  {
+                 const long long pos ) {
   int rest = size;
   errno = 0;
-  while( rest > 0 )
-    {
+  while( rest > 0 ) {
     const int n = pwrite( fd, buf + size - rest, rest, pos + size - rest );
-    if( n > 0 ) rest -= n;
-    else if( n < 0 && errno != EINTR && errno != EAGAIN ) break;
+    if( n > 0 ) 
+      rest -= n;
+    else if( n < 0 && errno != EINTR && errno != EAGAIN ) 
+      break;
     errno = 0;
-    }
-  return size - rest;
   }
+  return size - rest;
+}
 
 
 int decompress_read_error( struct LZ_Decoder * const decoder,

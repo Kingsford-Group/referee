@@ -16,7 +16,9 @@ maintains OutputBuffers for the clusters
 chrono::duration<double> elapsed_seconds_d2_loop2;
 chrono::duration<double> elapsed_seconds_d2_loop3;
 
-
+////////////////////////////////////////////////////////////////
+//
+////////////////////////////////////////////////////////////////
 float d2_fast(shared_ptr<unordered_map<int, int>> profile_kmers, float const f1, 
 	unordered_map<int,int> const & counts, float const f2) {
 	chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
@@ -124,6 +126,9 @@ char weighted_mode(string & qual, int & f) {
 	return max_i + ' ';
 }
 
+////////////////////////////////////////////////////////////////
+//
+////////////////////////////////////////////////////////////////
 string to_cigar(string const & s) {
 	string cigar = "";
 	int off = 1, i = 1;
@@ -151,8 +156,9 @@ string to_cigar(string const & s) {
 class QualityCompressor {
 public:
 	///////////////////////////////////////////////////////////
-	QualityCompressor(Packet_courier * c, string const & fname, float pa, int bs, int k):
+	QualityCompressor(Packet_courier * c, shared_ptr<ofstream> gc_out, string const & fname, float pa, int bs, int k):
 		courier(c),
+		genomic_coord_out(gc_out),
 		fname(fname),
 		percent_abundance(pa), 
 		bootstrap_size(bs), 
@@ -179,7 +185,7 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////
-	void handleRead(char * qual_read, int len) {
+	void handleRead(char * qual_read, int len, GenomicCoordinate & gc) {
 		string s;
 		// TODO: is this a documented fact that need to add '!'
 		for (auto i = 0; i < len; i++) s += qual_read[i] + '!';
@@ -196,7 +202,7 @@ public:
 		else {
 			// have fixed clusters -- assign read to one of the existing clusters, output
 			// assignQualityVector(s, len, observed_vectors, false);
-			writeToCluster(s, len, observed_vectors);
+			writeToCluster(s, len, observed_vectors, gc);
 		}
 		observed_vectors++;
 	}
@@ -208,6 +214,8 @@ public:
 	}
 
 private:
+
+	shared_ptr<ofstream> genomic_coord_out;
 
 	Packet_courier * courier;
 
@@ -231,7 +239,7 @@ private:
 	string fname; // path to the original sam file
 
 	///////////////////////////////////////////////////////////
-	// Assumes that q_v is already reverse according to the reverse complement bit
+	// Assumes that q_v is already reversed according to the reverse complement bit
 	///////////////////////////////////////////////////////////
 	void assignQualityVector(string & q_v, int q_v_len, int id) {
 		int mode_frequency = 0;
@@ -272,33 +280,27 @@ private:
 
 	// write a quality value w/o splitting it into prefix, core, suffix
 	chrono::duration<double> elapsed_writes;
-	void write(string & s, shared_ptr<QualityCluster> c) {
+	void write(string & s, shared_ptr<QualityCluster> c, GenomicCoordinate & gc) {
 		chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
-		// auto cig = to_cigar(s);
-		c->writeCore( s );
+		c->writeCore( s, gc );
 		chrono::time_point<std::chrono::system_clock> end = chrono::system_clock::now();
 		elapsed_writes += (end - start);
 	}
 
-	void write(string & q_v, string & prefix, string & suffix,shared_ptr<QualityCluster> clust) {
+	void write(string & q_v, string & prefix, string & suffix,shared_ptr<QualityCluster> clust, GenomicCoordinate & gc) {
 		chrono::time_point<std::chrono::system_clock> start = chrono::system_clock::now();
-		// auto cig = to_cigar(q_v);
-		clust->writeCore( q_v );
-		//cig = to_cigar(prefix);
-		//clust->writePrefix(cig);
-		clust->writePrefix(prefix);
-		//cig = to_cigar(suffix);
-		//clust->writeSuffix(cig);
-		clust->writeSuffix(suffix);
+		clust->writeCore( q_v, gc);
+		clust->writePrefix(prefix, gc);
+		clust->writeSuffix(suffix, gc);
 		chrono::time_point<std::chrono::system_clock> end = chrono::system_clock::now();
 		elapsed_writes += (end - start);
 	}
 
-	void writeToCluster(string & q_v, int q_v_len, int id) {
+	void writeToCluster(string & q_v, int q_v_len, int id, GenomicCoordinate & gc) {
 		int mode_frequency = 0;
 		char m = weighted_mode(q_v, mode_frequency);
 		if (mode_frequency < 0.26 * q_v_len) {
-			write(q_v, others);
+			write(q_v, others, gc);
 			// record the the vector when into a general pile
 			cluster_membership.push_back(generic_pile_id);
 			return;
@@ -313,14 +315,14 @@ private:
 			for (auto clust : clusters) {
 				float d = d2_fast(clust->getProfileKmers(), clust->getProfileSize() - K_c + 1.0f, q_kmers, f2);
 				if (d < 0.05) {
-					write(q_v, prefix, suffix, clust);
+					write(q_v, prefix, suffix, clust, gc);
 					cluster_membership.push_back(clust->getClusterID());
 					return;
 				}
 			}
 
 			if (!found) {
-				write(q_v, others);
+				write(q_v, others, gc);
 				cluster_membership.push_back(generic_pile_id);
 			}
 		}
@@ -376,12 +378,12 @@ private:
 
 		// write out clusters, empty their containers, keep references to the output buffers around
 		for (auto i = 0; i < clusters.size(); i++) {
-			clusters[i]->openOutputStream(fname, K_c);
+			clusters[i]->openOutputStream(fname, genomic_coord_out, K_c);
 			// write accumualted vectors to the stream
 			clusters[i]->flushBootstrapData();
 		}
 
-		others->openOutputStream(fname, K_c);
+		others->openOutputStream(fname, genomic_coord_out, K_c);
 		others->flushBootstrapData();
 	}
 };

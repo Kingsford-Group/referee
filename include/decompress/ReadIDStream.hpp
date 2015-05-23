@@ -8,9 +8,11 @@
 
 class ReadIDStream {
 public:
-	ReadIDStream(string & file_name) {
-		read_ids_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".ids") );
-	}
+	// ReadIDStream(string & file_name) {
+	// 	read_ids_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".ids") );
+	// }
+
+	ReadIDStream(shared_ptr<InputBuffer> in) : read_ids_in(in) {}
 
 	int getNextID(string & id) {
 		// exhausted the input stream

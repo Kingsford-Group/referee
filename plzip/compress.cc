@@ -234,8 +234,8 @@ extern "C" void * csplitter( void * arg )
 
 
 
-       // get packets from courier, replace their contents, and return
-       // them to courier.
+// get packets from courier, replace their contents, and return
+// them to courier.
 extern "C" void * cworker( void * arg )
   {
   // std::cerr << "cworker: launched, hanging out" << std::endl;
@@ -330,26 +330,24 @@ extern "C" void * cworker( void * arg )
 
 // get the processed and sorted packets from courier, write
 // their contents to the output file.
-void muxer( Packet_courier & courier /*, const Pretty_print & pp*/)
-  {
+void muxer( Packet_courier & courier /*, const Pretty_print & pp*/) {
   std::vector< const Packet * > packet_vector;
-  while( true )
-    {
+  while ( true ) {
+    // block call -- synchronises on a mutex
     courier.deliver_packets( packet_vector );
     if( packet_vector.size() == 0 ) {
       // std::cerr << "muxer::do not see any more packets. breaking" << std::endl;
       break;		// all workers exited
     }
 
-    for( unsigned i = 0; i < packet_vector.size(); ++i )
-      {
+    for( unsigned i = 0; i < packet_vector.size(); ++i ) {
       const Packet * const opacket = packet_vector[i];
       out_size += opacket->size;
 
       int outfd = opacket->outfd;
 
       if( outfd >= 0 ) {
-        // std::cerr << "writing a compressed block (size=" << opacket->size << ") to fd=" << outfd << std::endl;
+        std::cerr << "writing a compressed block (size=" << opacket->size << ") to fd=" << outfd << std::endl;
         const int wr = writeblock( outfd, opacket->data, opacket->size );
         if( wr != opacket->size )
           { 
@@ -362,10 +360,10 @@ void muxer( Packet_courier & courier /*, const Pretty_print & pp*/)
       // std::cerr << "removing temp compressed data" << std::endl;
       delete[] opacket->data;
       delete opacket;
-      }
     }
-    // std::cerr << "muxer exited" << std::endl;
   }
+    // std::cerr << "muxer exited" << std::endl;
+}
 
 // } // end namespace
 

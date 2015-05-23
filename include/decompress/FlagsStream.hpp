@@ -8,10 +8,12 @@
 
 class FlagsStream {
 public:
-	FlagsStream(string & file_name/*, TranscriptsStream const & transcripts*/) {
-		flags_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".flags") );
-		// blah = transcripts.getFlagDictionary();
-	}
+	// FlagsStream(string & file_name/*, TranscriptsStream const & transcripts*/) {
+	// 	flags_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".flags") );
+	// 	// blah = transcripts.getFlagDictionary();
+	// }
+
+	FlagsStream(shared_ptr<InputBuffer> in) : flags_in(in) {}
 
 	int getNextFlagSet(vector<int> & flags) {
 		// TODO

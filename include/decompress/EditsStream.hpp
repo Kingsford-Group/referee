@@ -8,34 +8,39 @@
 
 class EditsStream {
 public:
-	EditsStream(string const & file_name) {
-		edits_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".edits") );
-		if (!edits_in->opened()) {
-			cerr << "[ERROR] Required file missing. Terminating." << endl;
-			exit(1);
-		}
-		// first 2 bytes contain the read length
-		read_len = edits_in->getNextByte();
-		bytes_read++;
+	// EditsStream(string const & file_name) {
+	// 	edits_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".edits") );
+	// 	if (!edits_in->opened()) {
+	// 		cerr << "[ERROR] Required file missing. Terminating." << endl;
+	// 		exit(1);
+	// 	}
+	// 	// first 2 bytes contain the read length
+	// 	read_len = edits_in->getNextByte();
+	// 	bytes_read++;
 
-		has_edits_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".has_edits") );
-		if (!has_edits_in->opened()) {
-			cerr << "[ERROR] Required file missing. Terminating." << endl;
-			exit(1);
-		}
-		// first 4 bytes hold the number of alignments total
-		uint8_t c = has_edits_in->getNextByte();
-		alignments_expected |= ( c << 24) ;
-		c = has_edits_in->getNextByte();
-		alignments_expected |= ( c << 16) ;
-		c = has_edits_in->getNextByte();
-		alignments_expected |= ( c << 8) ;
-		c = has_edits_in->getNextByte();
-		alignments_expected |= ( c ) ;
+	// 	has_edits_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".has_edits") );
+	// 	if (!has_edits_in->opened()) {
+	// 		cerr << "[ERROR] Required file missing. Terminating." << endl;
+	// 		exit(1);
+	// 	}
+	// 	// first 4 bytes hold the number of alignments total
+	// 	uint8_t c = has_edits_in->getNextByte();
+	// 	alignments_expected |= ( c << 24) ;
+	// 	c = has_edits_in->getNextByte();
+	// 	alignments_expected |= ( c << 16) ;
+	// 	c = has_edits_in->getNextByte();
+	// 	alignments_expected |= ( c << 8) ;
+	// 	c = has_edits_in->getNextByte();
+	// 	alignments_expected |= ( c ) ;
 
-		has_edit_byte = has_edits_in->getNextByte();
-		// cerr << "First has edit byte: " << (int)has_edit_byte << " i=" << (int)i << endl;
-	}
+	// 	has_edit_byte = has_edits_in->getNextByte();
+	// 	// cerr << "First has edit byte: " << (int)has_edit_byte << " i=" << (int)i << endl;
+	// }
+
+
+	EditsStream(shared_ptr<InputBuffer> e, shared_ptr<InputBuffer> h): 
+		edits_in(e), 
+		has_edits_in(h) {}
 
 	~EditsStream() {
 		cerr << "Expected: " << alignments_expected << " observed: " << alignment_count << endl;
