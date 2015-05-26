@@ -303,10 +303,9 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 
 			input_streams.offs = shared_ptr<OffsetsStream>(new OffsetsStream(offset_ib) );
 		}
-		// TODO: add more inputs
 	}
 
-	// input intervals: need to be decompressed
+	// input intervals: the ones that need to be decompressed
 	vector<GenomicInterval> intervals;
 	GenomicInterval test_interval(0, 0, 1000000);
 	intervals.push_back(test_interval);
