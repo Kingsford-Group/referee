@@ -109,7 +109,7 @@ public:
 
 	friend void writeOpt(string opt, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
 
-	friend void writeUnaligned(UnalignedRead & read, shared_ptr<OutputBuffer> o_str);
+	friend void writeUnaligned(UnalignedRead & read, bool seq_only, shared_ptr<OutputBuffer> o_str);
 
 	////////////////////////////////////////////////////////////////
 	// stream size
@@ -320,23 +320,27 @@ void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, shared_ptr<
 	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord);
 }
 
-void writeUnaligned(UnalignedRead & read, shared_ptr<OutputBuffer> o_str) {
+void writeUnaligned(UnalignedRead & read, bool seq_only, shared_ptr<OutputBuffer> o_str) {
 	o_str->data.push_back('>');
 	// write read id
-	for (auto c : read.read_name) o_str->data.push_back(c);
-	//int len = strlen(read.read_name);
-        //for (auto i = 0; i < len; i++)
-        //        o_str->data.push_back(read.read_name[i]);
+	if (!seq_only) {
+		for (auto c : read.read_name) o_str->data.push_back(c);
+		//int len = strlen(read.read_name);
+	        //for (auto i = 0; i < len; i++)
+        	//        o_str->data.push_back(read.read_name[i]);
+	}
 	o_str->data.push_back('\n');
 	// write read seq
 	for (auto c : read.seq) o_str->data.push_back(c);
+	o_str->data.push_back('\n');
+	if (!seq_only) {
+		//write read quals
+		for (auto c : read.qual) o_str->data.push_back(c);
 		o_str->data.push_back('\n');
-	//write read quals
-	for (auto c : read.qual) o_str->data.push_back(c);
-	o_str->data.push_back('\n');
-	// strand
-	o_str->data.push_back('+');
-	o_str->data.push_back('\n');
+		// strand
+		o_str->data.push_back('+');
+		o_str->data.push_back('\n');
+	}
 	GenomicCoordinate g;	// empty coordinate
 	if (o_str->timeToDump()) o_str->compressAndWriteOut( g );
 }

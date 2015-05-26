@@ -1,6 +1,6 @@
 CC=g++
 CFLAGS=-std=c++11 -O3 -w
-CCPARALL=-fopenmp -D_GLIBCXX_PARALLEL
+# CCPARALL=-fopenmp -D_GLIBCXX_PARALLEL
 #CFLAGSLIB=-shared -fPIC
 #PLIBZ=
 BIN=bin
@@ -20,8 +20,10 @@ SYSTEM=linux
 # MAC
 ifeq ($(SYSTEM),macos)
 		# why do we need this include?
-        TBBINCL=-I $(HOME)/tbb/tbb43_20140724oss/include/ -I $(HOME)/tbb/tbb43_20140724oss/examples/common/utility/
-        TBBLIBS=-L $(HOME)/tbb/tbb43_20140724oss/build/macos_intel64_gcc_cc4.9.0_os10.9.5_release/ -ltbb
+        # TBBINCL=-I $(HOME)/tbb/tbb43_20140724oss/include/ -I $(HOME)/tbb/tbb43_20140724oss/examples/common/utility/
+        # TBBLIBS=-L $(HOME)/tbb/tbb43_20140724oss/build/macos_intel64_gcc_cc4.9.0_os10.9.5_release/ -ltbb
+        TBBINCL=-I $(HOME)/tbb/tbb43_20150424oss/include/
+        TBBLIBS=-L $(HOME)/tbb/tbb43_20150424oss/lib/ -ltbb
         export DYLD_FALLBACK_LIBRARY_PATH=/Users/giantlynx/tbb/tbb43_20140724oss/build/macos_intel64_gcc_cc4.9.0_os10.9.5_release/
 else
         # Linux

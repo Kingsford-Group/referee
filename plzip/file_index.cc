@@ -98,7 +98,7 @@ File_index::File_index( const int infd ) : retval_( 0 ) {
       error_ += "member format not supported"; retval_ = 2; return; }
 
   while( pos >= min_member_size ) {
-    std::cerr << "reading at pos=" << pos << " ";
+    // std::cerr << "reading at pos=" << pos << " ";
     if( seek_read( infd, trailer.data, File_trailer::size, pos - File_trailer::size ) != File_trailer::size ) { 
       error_ = "Error reading member trailer :";
       error_ += std::strerror( errno ); 

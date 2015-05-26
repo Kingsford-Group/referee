@@ -550,7 +550,7 @@ private:
 		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), seq, al.quals(), rc);
 		// TODO: 10K - arbitrary parameter, may be as big or as small as one wants
 		if (unaligned_reads.size() >= 10000) {
-			cerr << "Used rc " << used_rc << " ";
+			// cerr << "Used rc " << used_rc << " ";
 			flushUnalignedReads();
 		}
 	}
@@ -571,7 +571,7 @@ private:
 		});
 		// write out
 		for (auto read : unaligned_reads) {
-			writeUnaligned(read, out_buffers.unaligned_buf);
+			writeUnaligned(read, seq_only, out_buffers.unaligned_buf);
 		}
 		unaligned_reads.clear();
 	}

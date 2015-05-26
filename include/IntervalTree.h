@@ -53,8 +53,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////
 class GenomicCoordinate {
 public:
-    int chromosome = -1;
-    int offset = -1;
+    int chromosome = 0;
+    int offset = 0;
 
     GenomicCoordinate() {}
 

@@ -40,7 +40,7 @@ Params parseParameters(int argc, char * argv[]) {
         }
         else if ( strcmp(argv[i], "--seqOnly") == 0) {
             p.seq_only = true;
-        } 
+        }
         else if (strcmp(argv[i], "--discardSecondary") == 0) {
             p.discard_secondary_alignments = true;
         }
