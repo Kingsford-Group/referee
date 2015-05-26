@@ -34,7 +34,8 @@ public:
 	///////////////////////////////////////////////////////////
 	// provides a pointer to a stream for recording genomic coordiantes corresponding
 	// to the compressed blocks
-	OutputBuffer(Packet_courier * c, shared_ptr<ofstream> genomic_coord_out, string const & fn, string const & suff, int d = 1<<23, int match_len = 36): 
+	OutputBuffer(Packet_courier * c, shared_ptr<ofstream> genomic_coord_out, 
+		string const & fn, string const & suff, int d = 1<<23, int match_len = 36): 
 		courier(c),
 		genomic_coordinates_out(genomic_coord_out),
 		stream_suffix(suff),

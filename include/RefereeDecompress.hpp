@@ -270,4 +270,81 @@ int decompressFile(string const & file_name, string const & ref_file_name,
     cerr << "Done, done, done!" << endl;
 }
 
+
+
+
+////////////////////////////////////////////////////////////////
+//
+// Read file indices, assign threads to parse blocks, wait for
+// threads to finish (join) and clean up.
+//
+////////////////////////////////////////////////////////////////
+int decompressFileSequential(string const & file_name, string const & ref_file_name, 
+	string const & fname_out, const int num_workers) {
+
+	// set up inputs
+	unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>> all_intervals = 
+		parseGenomicIntervals("genomic_intervals.txt");
+	InputStreams input_streams;
+
+	int buffer_size = pow(2, 24); // 16Mb
+	int buffer_id = 0;
+	unordered_map<int, shared_ptr<InputBuffer>> buffer_map;
+
+	vector<shared_ptr<InputBuffer>> input_buffers;
+	for (auto pair : all_intervals) {
+		auto suffix = pair.first;
+		auto intervals = pair.second;
+		if (suffix.compare(".offs.lz") == 0) {
+			shared_ptr<InputBuffer> offset_ib(new InputBuffer(file_name + suffix, 
+				intervals, buffer_size, buffer_id));
+			input_buffers.push_back(offset_ib);
+			buffer_map.emplace(buffer_id++, offset_ib);
+
+			input_streams.offs = shared_ptr<OffsetsStream>(new OffsetsStream(offset_ib) );
+		}
+		// TODO: add more inputs
+	}
+
+	// input intervals: need to be decompressed
+	vector<GenomicInterval> intervals;
+	GenomicInterval test_interval(0, 0, 1000000);
+	intervals.push_back(test_interval);
+
+	// TODO: sort intervals by placing same chromo/transcript nearby (and lexicographically sorted)
+
+	// queue with packets of bytes -- compressed and decompressed
+	concurrent_queue<shared_ptr<DataPacket>> Q;
+
+	// flag indicating whether there are more packets coming or not
+	bool done = false;
+
+	// set up multiple threads
+	omp_set_dynamic(true);
+    auto max_threads = omp_get_num_procs();
+    omp_set_num_threads( (int)min( (int)num_workers, max_threads) );
+    cerr << "Threads:\t" << (int)min( (int)num_workers, max_threads) << endl;
+
+    #pragma omp parallel shared(done)
+    {
+        int threadID = omp_get_thread_num(); // my thread number
+        if (threadID == 0) {
+        	// find blocks that overlap with the input intervals
+        	// enqueue them for decompression
+        	enqueueBlocks(Q, intervals, input_buffers, done);
+        }
+        else if (threadID == 1) {
+        	stitchAlignments(input_streams, intervals, fname_out, ref_file_name, done);
+        }
+        else {
+            // launch multiple producers
+            lzipDecompress(Q, buffer_map, done);
+        }
+    }
+    // all threads finish and join here
+    cerr << "Done, done, done!" << endl;
+}
+
+#endif
+
 #endif

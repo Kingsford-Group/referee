@@ -232,7 +232,7 @@ public:
 		// TODO: set dictionary size, match len parameters
 		if (cluster_id < 0 || is_pile) {
 			output_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
-				genomic_coords_out, fname_prefix, ".other.lz" ) );
+				genomic_coords_out, fname_prefix, ".other.lz", 3 << 20,  12 ) ); // equivalent of -4
 		}
 		else {
 			output_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
