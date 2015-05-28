@@ -9,14 +9,16 @@
 #include <fcntl.h>
 #include <unistd.h>
 
+#include <lzlib.h>
+
 // #include "plzip/file_index.h"
 
-#include "tbb/concurrent_queue.h"
+// #include "tbb/concurrent_queue.h"
 
 #include "IntervalTree.h"
 
 using namespace std;
-using namespace tbb;
+// using namespace tbb;
 
 #define END_OF_STREAM -1
 #define SUCCESS 1
@@ -37,8 +39,8 @@ typedef int chromo_id_t;
 class DataPacket {
 public:
 	DataPacket(const int id, RawDataInterval i, shared_ptr<vector<uint8_t>> d,
-		int s): 
-		interval(i), 
+		int s):
+		interval(i),
 		buffer_id(id),
 		data(d) {}
 
@@ -62,6 +64,9 @@ private:
 };
 
 
+////////////////////////////////////////////////////////////////
+//
+////////////////////////////////////////////////////////////////
 class MyBlock {
 public:
 	int compressed_size = -1;			// block's size (including header and trailer)
@@ -75,6 +80,103 @@ public:
 };
 
 
+// write raw data into decoder's stream
+void writeToBuffer(LZ_Decoder * const decoder, shared_ptr<vector<uint8_t>> raw_data) {
+	
+}
+
+////////////////////////////////////////////////////////////////
+//
+// http://www.nongnu.org/lzip/manual/lzlib_manual.html#Examples
+// example 8
+//
+////////////////////////////////////////////////////////////////
+vector<uint8_t> unzipData(shared_ptr<vector<uint8_t>> raw_data, int const new_data_size) {
+	cerr << "Unzipping LZIP block expected size: " << new_data_size << endl;
+	vector<uint8_t> unzipped_data(new_data_size, 0); // allocate needed amount of bytes
+
+	// prepare a decoder stream
+	LZ_Decoder * const decoder = LZ_decompress_open();
+	if (LZ_decompress_errno( decoder ) != LZ_ok ) { 
+		LZ_decompress_close( decoder );
+		cerr << "[ERROR] Could not initialize decoder" << endl;
+		exit(1);
+	}
+	int wrote = 0, bytes_read = 0, need_to_write = raw_data->size();
+	int chunk_size = LZ_decompress_write_size( decoder );
+	assert(chunk_size > 0);
+	chunk_size = std::min( chunk_size, need_to_write);
+	// cerr << "Can write " << chunk_size << " need to write " << need_to_write << endl;
+
+
+	int nz = 0;
+	// cerr << "magic: " << (*raw_data)[0] << (*raw_data)[1] << (*raw_data)[2] << 
+	// 	(*raw_data)[3] << 
+	// 	" version: " << (int)(*raw_data)[4] << 
+	// 	" coded_dict_size: " << (int)(*raw_data)[5] << endl;
+	// for (auto c : *raw_data)
+	// 	nz += (c > 0);
+	// cerr << "block has: " << nz << " non-zero entries" << endl;
+
+	bool trailing_garbage_found = false;
+	while (wrote < need_to_write && !trailing_garbage_found && (chunk_size > 0) ) {
+		int written = LZ_decompress_write( decoder, (uint8_t *) &(*raw_data)[wrote], chunk_size );
+		if (written != chunk_size) {
+			cerr << "[ERROR] Lzlib error: attempted to write (" << written << ")" << endl;
+			exit(1);
+		}
+		if (written < 0) {
+			cerr << "[ERROR] Could not write to decoder" << endl;
+			exit(1);	
+		}
+		wrote += written;
+		cerr << "wrote " << written << " ";
+
+		int read = LZ_decompress_read( decoder, (uint8_t *) &unzipped_data[bytes_read], new_data_size - bytes_read );
+		bytes_read += read;
+		cerr << "read " << read << " ";
+
+		chunk_size = LZ_decompress_write_size( decoder );
+	}
+	cerr << "total bytes written: " << wrote << " total bytes read: " << bytes_read << endl;
+	assert( wrote >= need_to_write );
+	assert(bytes_read == new_data_size);
+
+	// int read = LZ_decompress_read( decoder, (uint8_t *) &unzipped_data[bytes_read], new_data_size - bytes_read );
+	// cerr << " read " << read << " ";
+	// if( read < 0 ) {
+	// 	if( LZ_decompress_errno( decoder ) == LZ_header_error ) {
+	// 		cerr << "sync to memebr ";
+	// 		LZ_decompress_sync_to_member( decoder );
+	// 		int read = LZ_decompress_read( decoder, (uint8_t *) &unzipped_data[bytes_read], new_data_size - bytes_read );
+	// 		cerr << " read2 " << read << " ";
+ //        	// trailing_garbage_found = true;
+ //        }
+ //        else {
+	// 		cerr << "[ERROR] LZIP decompress error" << endl;
+	// 		exit(1);
+	// 	}
+	// }
+	
+	LZ_decompress_finish( decoder );
+
+	auto retval = LZ_decompress_finished( decoder );
+	// destroys all internal data
+	LZ_decompress_close( decoder );
+
+	nz = 0;
+	for (auto c : unzipped_data) nz += (c > 0);
+
+	cerr << "Data: nz=" << nz << " ";
+	for (int i = 0; i < 200; i++) cerr << unzipped_data[i];
+		cerr << endl;
+
+	// TODO: might be better to keep around a decoder if set up is expensive
+	// LZ_decompress_reset( decoder );	// prepare for new member
+
+	return unzipped_data;
+}
+
 
 ////////////////////////////////////////////////////////////////
 //
@@ -83,70 +185,73 @@ public:
 ////////////////////////////////////////////////////////////////
 class InputBuffer {
 
-	////////////////////////////////////////////////////////////////
-	void createChromosomeIntervalTree(int const chromoID,
-			shared_ptr<vector<TrueGenomicInterval>> genomic_intervals,
-			vector<MyBlock> & lzip_blocks,
-			vector<RawDataInterval> & leftovers,
-			int i, int prev_i) {
-		auto first_gi = genomic_intervals->at(prev_i);
-		auto last_gi = genomic_intervals->at(i - 1);
-		vector<RawDataInterval> chromosome_intervals;
+	void createTree(int const chromo, 
+		vector<RawDataInterval> const & chromo_intervals, 
+		unordered_map<chromo_id_t, IntervalTree<int,int> > & chromosome_trees) {
+		chromosome_trees[chromo] = 
+				IntervalTree<int,int>(chromo_intervals);
+		cerr << "Chromosome tree: " << chromosome_trees.size();
+	}
 
-		// add leftovers to the vector
-		for (auto i : leftovers)
-			chromosome_intervals.push_back(i);
-		// chromosome_intervals.insert(leftovers.begin(), leftovers.end() );
-		leftovers.clear();
-		// 
-		for (auto j = 0; j < i - prev_i; j++) {
-			auto gi = genomic_intervals->at(prev_i + j);
-			auto block = lzip_blocks[prev_i + j];
-			// signature:
-			// RawDataInterval(size_t off, size_t size, size_t ex, int chr, int s, int e): 
-			if (gi.start.chromosome != gi.end.chromosome) {
-				// spans several chromosomes
-				auto chromo_span = gi.end.chromosome - gi.start.chromosome - 1;
-				chromosome_intervals.emplace_back(
-					block.offset, block.compressed_size, block.decompressed_size,
-					gi.start.chromosome, gi.start.offset, chromo_max);
-				chromosome_trees[gi.start.chromosome] = 
-					IntervalTree<int,int>(chromosome_intervals);
+	void createChromosomeIntervalTree2(
+		shared_ptr<vector<TrueGenomicInterval>> genomic_intervals, 
+		vector<MyBlock> & lzip_blocks, 
+		unordered_map<chromo_id_t, IntervalTree<int,int> > & chromosome_trees) {
 
-				// start a new tree!
-				// add default spans for all chromosomes in between
-				int k = 0;
-				while (k < chromo_span) {
-					chromosome_intervals.clear();
-					chromosome_intervals.emplace_back(
-						block.offset, block.compressed_size, block.decompressed_size,
-						gi.start.chromosome + k + 1, chromo_min, chromo_max);
-					chromosome_trees[gi.start.chromosome + k + 1] = 
-						IntervalTree<int,int>(chromosome_intervals);
-					k++;
-				}
-				// technically, this is LEFTOVERS
-				// chromosome_intervals.clear();
-				leftovers.clear();
-				leftovers.emplace_back(
+		// int range_start = 0, range_end = 0;
+		int prev_chromo = genomic_intervals->at(0).start.chromosome;
+		vector<RawDataInterval> chromo_intervals;
+		for (int i = 0; i < genomic_intervals->size(); i++) {
+			auto interval = genomic_intervals->at(i);
+			if (prev_chromo != interval.start.chromosome) {
+				// create a tree for intervals in [range_start, range_end]
+				createTree(prev_chromo, chromo_intervals, chromosome_trees);
+				// start a new range at this index
+				chromo_intervals.clear();
+				// range_start = i;
+				prev_chromo = interval.start.chromosome;
+			}
+			
+			// interval.start.chromosome is prev_chromo
+			if (interval.start.chromosome == interval.end.chromosome) {
+				// start and end chromosome are the same and equal prev_chromo
+				// range_end = i;
+				chromo_intervals.emplace_back(
 					block.offset, block.compressed_size, block.decompressed_size,
-					gi.end.chromosome, chromo_min, gi.end.offset);
-				// return this interval at the end
+					gi.start.chromosome, gi.start.offset, gi.end.offset);
+				// moving on...
 			}
 			else {
-				// contained within chromosome
-				chromosome_intervals.emplace_back(
+				// figure out how many chromos this interval spans
+				auto chromo_span = interval.end.chromosome - interval.start.chromosome - 1;
+				// split the interval as many times as needed (at least 2 pieces)
+				// first create a tree for chromo_intervals w/ a starting piece of the current interval
+				chromo_intervals.emplace_back(
 					block.offset, block.compressed_size, block.decompressed_size,
-					gi.start.chromosome, gi.start.offset, gi.end.offset );
+					gi.start.chromosome, gi.start.offset, chromo_max);
+				// then create tree(s) for every chromo that is in between the start and the end
+				chromo_intervals.clear();
+				int k = 0;
+				while (k < chromo_span) {
+					chromo_intervals.emplace_back(
+						block.offset, block.compressed_size, block.decompressed_size,
+						gi.start.chromosome + k + 1, chromo_min, chromo_max);
+					createTree(gi.start.chromosome + k + 1, chromo_intervals, chromosome_trees);
+					chromo_intervals.clear();
+					k++;
+				}
+				// then add the leftover piece to the chromo_intervals
+				chromo_intervals.emplace_back(
+					block.offset, block.compressed_size, block.decompressed_size,
+					gi.end.chromosome, chromo_min, gi.end.offset);
+				prev_chromo = gi.end.chromosome;
 			}
+			
 		}
-
-		if (last_gi.end.chromosome == first_gi.start.chromosome) {
-			chromosome_trees[chromoID] = IntervalTree<int,int>(chromosome_intervals);
-			chromosome_intervals.clear();
-		}
-		// return chromosome_intervals;
+		// create a tree for intervals in chromo_intervals
+		createTree(prev_chromo, chromo_intervals, chromosome_trees);
 	}
+
 
 public:
 	////////////////////////////////////////////////////////////////
@@ -156,40 +261,78 @@ public:
 	////////////////////////////////////////////////////////////////
 	InputBuffer(string const & fname, shared_ptr<vector<TrueGenomicInterval>> genomic_intervals, int id, int bs = 1<<22):
 		buffer_id(id),
+		name(fname),
 		buffer_size(bs),
-		f_in(fname.c_str(), ifstream::in)  {
+		f_in(fname.c_str(), ifstream::in | ios::binary | ios::ate)  {
 			// f_in = open(fname.c_str(), ifstream::in);
 			if (!f_in) {
 				cerr << "[INFO] Could not open file: " << fname << endl;
+				return;
 			}
 
 		// interval trees -- one per chromosome
 		// fill out chromosome_trees
 		auto lzip_blocks = seek_blocks(f_in);
-		int chromoID = genomic_intervals->at(0).start.chromosome;
-		int i, prev_i = 0;
-		vector<RawDataInterval> leftovers;
-		for (i = 1; i < genomic_intervals->size(); i++) {
-			auto interval = genomic_intervals->at(i);
-			if (chromoID != interval.start.chromosome) {
-				// create new tree(s)
-				// genomic_intervals[prev_i, i-1];
-				createChromosomeIntervalTree(chromoID, genomic_intervals, lzip_blocks, leftovers, i, prev_i);
-				// update chromo ID
-				chromoID = interval.end.chromosome;
-				prev_i = i;
-			}
-		}
-		cerr << fname << " trees: " << chromosome_trees.size() << endl;
-		// process remaining intervals
-		// genomic_intervals[prev_i:]
-		createChromosomeIntervalTree(chromoID, genomic_intervals, lzip_blocks, leftovers, i, prev_i);
+		cerr << fname << " blocks: " << lzip_blocks.size() << endl;
+		cerr << "BUILDING TREES" << endl;
 
+		createChromosomeIntervalTree2(genomic_intervals, lzip_blocks, chromosome_trees);
+		cerr << " Total trees: " << chromosome_trees.size() << endl;
 	}
 
 	////////////////////////////////////////////////////////////////
 	~InputBuffer() {
 		f_in.close();
+	}
+
+	////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////
+	int loadOverlappingBlock(int chromo, int start_coord,
+		bool & is_transcript_start) {
+		
+		bytes.clear();
+		auto tree = chromosome_trees[chromo];
+		vector<RawDataInterval> overlapping;
+
+		// todo: find the first available coordinate
+		auto first_it = tree.getFirstInterval();
+		if (first_it.chromosome < 0) {
+			// no intervals in a tree
+			return -1;
+		}
+		if (start_coord < first_it.start) {
+			start_coord = first_it.start;
+			is_transcript_start = true;
+		}
+
+		cerr << "Load overlapping block for chr=" << chromo << ":" << start_coord << endl;
+		tree.findOverlapping(start_coord, start_coord + 1, overlapping);
+		cerr << "Num overlapping blocks: " << overlapping.size() << endl;
+		if (overlapping.size() > 0) {
+			no_blocks = false;
+			// decompress the first block, prepare to serve it to the wrapping buffer
+			RawDataInterval block = overlapping[0];
+			// read block bytes from the LZ stream
+			f_in.seekg(0, f_in.beg);
+			f_in.seekg(block.byte_offset);
+			shared_ptr<vector<uint8_t>> raw_bytes(new vector<uint8_t>(block.block_size) );
+			f_in.read( (char *) &(*raw_bytes)[0], block.block_size);
+			cerr << "Read " << block.block_size << " bytes" << endl;
+			// for (auto c : *raw_bytes) cerr << (int)c;
+			// cerr << "------";
+			auto unzipped_data = unzipData(raw_bytes, block.decompressed_size);
+			cerr << "Expected: " << block.decompressed_size << " bytes; got: " << unzipped_data.size() << endl;
+			for (auto b : unzipped_data)
+				bytes.push_back(b);
+			cerr << block.start << endl;
+			return block.start;
+		}
+		else {
+			// no data
+			no_blocks = true;
+		}
+		return start_coord;
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -199,6 +342,7 @@ public:
 	deque<RawDataInterval> findOverlappingBlocks(GenomicInterval & interval) {
 		deque<RawDataInterval> overlapping_blocks;
 
+		// cerr << "Tree cnt: " << chromosome_trees.size() << endl;
 		int chromo = interval.chromosome;
 		auto tree = chromosome_trees[chromo];
 		vector<RawDataInterval> overlapping_intervals;
@@ -208,7 +352,7 @@ public:
 		for (auto intvl : overlapping_intervals) {
 			// create a block w/ byte offset, chromosome, appropriate start, end
 			overlapping_blocks.emplace_back(intvl);
-				// intvl.value, block_size, 
+				// intvl.value, block_size,
 				// 		decompressed_size, chromo, intvl.start, intvl.stop);
 		}
 		return overlapping_blocks;
@@ -219,17 +363,19 @@ public:
 	// create a DataPacket, enqueue it
 	// should only overlap a single block
 	////////////////////////////////////////////////////////////////
-	void enqueueBlock(const RawDataInterval & block, concurrent_queue<shared_ptr<DataPacket>> & Q) {
-		// set file cursor to the needed block (absolute position)
-		f_in.seekg(block.byte_offset);
+	// void enqueueBlock(const RawDataInterval & block, shared_ptr<concurrent_queue<shared_ptr<DataPacket>>> Q) {
+	// 	cerr << name.substr(name.size() - 10) << ": chr" << block.chromosome << ":" <<
+	// 		block.start << "-" << block.stop << endl;
+	// 	// set file cursor to the needed block (absolute position)
+	// 	f_in.seekg(block.byte_offset);
 
-		// read bytes
-		shared_ptr<vector<uint8_t>> raw_bytes(new vector<uint8_t>(block.block_size) );
-		f_in.read( (char *) &(*raw_bytes)[0], block.block_size);
+	// 	// read bytes
+	// 	shared_ptr<vector<uint8_t>> raw_bytes(new vector<uint8_t>(block.block_size) );
+	// 	f_in.read( (char *) &(*raw_bytes)[0], block.block_size);
 
-		shared_ptr<DataPacket> packet( new DataPacket(buffer_id, block, raw_bytes, block.decompressed_size) );
-		Q.push(packet);
-	}
+	// 	shared_ptr<DataPacket> packet( new DataPacket(buffer_id, block, raw_bytes, block.decompressed_size) );
+	// 	Q->push(packet);
+	// }
 
 	////////////////////////////////////////////////////////////////
 	//
@@ -250,7 +396,7 @@ public:
 	////////////////////////////////////////////////////////////////
 	bool hasMoreBytes() {
 		f_in.peek(); // peek -- will set the eof bits if reached the end of file
-		return bytes.size() > 0 || f_in.good(); // either have bytes in the buffer or have not reached eof
+		return bytes.size() > 0 || ( !no_blocks && f_in.good() ); // either have bytes in the buffer or have not reached eof
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -298,6 +444,11 @@ public:
 ////////////////////////////////////////////////////////////////
 private:
 
+	bool no_blocks = false;
+
+	// file stream name
+	string name;
+
 	unordered_map<chromo_id_t, IntervalTree<int,int> > chromosome_trees;
 	// unordered_map<chromo_id_t, IntervalTree<int,vector<uint8_t> > > unzipped_data_trees;
 
@@ -331,26 +482,36 @@ private:
 	//
 	////////////////////////////////////////////////////////////////
 	vector<MyBlock> seek_blocks(ifstream & f_in) {
-		cerr << "reading blocks from plziped stream" << endl;
+		// cerr << "reading blocks from plziped stream" << endl;
 		vector<MyBlock> blocks;
 		// set cursor at the end of the stream
 		f_in.seekg(0, f_in.end);
 		// length of file
-		int64_t pos = f_in.tellg();
+		int64_t file_len, pos, total = 0;
+		file_len = pos = f_in.tellg();
+		// shift by trailer::size
+		f_in.seekg( -File_trailer::size, f_in.cur);
+		// total += File_trailer::size;
+		cerr << "file len: " << file_len << " ";
 
 		File_header header;
   		File_trailer trailer;
   		// scan until cursor reaches the begining of the file
-  		while (f_in.tellg() > 0) {
+  		while (pos > 0) {
   			// read trailer
 			f_in.read( (char *) trailer.data, File_trailer::size);
 			// block size
 			auto member_size = trailer.member_size();
 			auto data_size = trailer.data_size();
+			// cerr << "m: " << member_size << " d: " << data_size << " ";
 			pos -= member_size;
+			total += member_size;
 			blocks.emplace_back(member_size, data_size, pos);
-			f_in.seekg( -member_size, f_in.cur);
+			f_in.seekg( -member_size - File_trailer::size, f_in.cur);
 		}
+		cerr << "..." << name.substr(name.size() - 10) << 
+			" File len: " << file_len << " byte seen: " << total << endl;
+		assert(total == file_len);
 		reverse( blocks.begin(), blocks.end() );
 		return blocks;
 	}

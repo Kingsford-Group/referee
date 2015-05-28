@@ -18,15 +18,14 @@ export DYLD_LIBRARY_PATH=plzip:$DYLD_LIBRARY_PATH
 DIR=/data/referee/aligned
 FILE=SRR445718.2m.sam
 # FILE=SRR445718.sam
-#FILE=SRR1294122.sam
-#DIR=.
-# FILE=test.sam
-# FILE=P_aeruginosa_PAO1.10mil.sam
+# FILE=SRR1294122.sam
+# FILE=P_aeruginosa_PAO1.sam
 # GENOME=/data/referee/aligned/NC_002516.fna
 # GENOME=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_002516.fna
 # GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
-GENOME=$DIR/human_genome.fa
-# GENOME=$DIR/human_chr10_37.2.fa
+# GENOME=$DIR/human_genome.fa
+GENOME=$DIR/human_chr10_37.2.fa
+# GENOME=$DIR/human_chr10.fa
 #FILE=K562_cytosol_LID8465_TopHat_v2.sam
 # FILE=NA12878_S1.sorted.sam
 
@@ -37,15 +36,8 @@ GENOME=$DIR/human_genome.fa
 TIMEOPT="-lp"
 
 T=10
-# SEQ="--seq"
-/usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t $T -r $GENOME $SEQ # > $DIR/$FILE.qualDelta.comp.log 2>&1
-# /usr/bin/time $TIMEOPT $BIN -c $DIR/$FILE -t 10 -r $GENOME # > $DIR/$FILE.seq_comp.log 2>&1
-# ls -l $DIR/$FILE.*
-# time plzip -vf $DIR/$FILE.k\=* 2> $DIR/$FILE.plzip
-# python python/parse_plzip_output.py $DIR/$FILE.plzip
-# $BIN -c $DIR/$FILE 10
-# ls -l $DIR/$FILE.*
-# /usr/bin/time -lp $BIN -c $DIR/P_aeruginosa_PAO1.10mil.sam
+SEQ="--seqOnly"
+# /usr/bin/time $TIMEOPT $BIN $DIR/$FILE -t $T -r $GENOME $SEQ # > $DIR/$FILE.qualDelta.comp.log 2>&1
 
 DECOMPRESS=1
 if [ $DECOMPRESS -eq 1 ]

@@ -56,10 +56,11 @@ Output_args initializeOutputStreams(string & name_prefix, bool seq_only,
 	Output_args oa(seq_only);
 	oa.offsets_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".offs.lz", 1<<22, 20) );
 	oa.edits_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".edits.lz" ) );
+	// set dictionary size to be small -- this is a barely compressible stream, so we won't try hard
+	oa.has_edits_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".has_edits.lz", 1 << 20, 5 ) );
 	oa.left_clips_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".left_clip.lz", 1<<22, 20) );
 	oa.right_clips_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".right_clip.lz", 1<<22, 20) );
-	oa.unaligned_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, name_prefix, ".unaligned.lz" ) );
-	
+	oa.unaligned_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, name_prefix, ".unaligned.lz", 3<<20, 12 ) );
 	if (!seq_only) {
 		oa.flags_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".flags.lz" ) );
 		oa.ids_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".ids.lz", 3 << 20,  12 ) );
@@ -67,8 +68,6 @@ Output_args initializeOutputStreams(string & name_prefix, bool seq_only,
 		// oa.quals_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, (name_prefix + ".quals.lz").c_str() ) );
 		oa.quals_buf = shared_ptr<QualityCompressor>(new QualityCompressor(courier, intervals, name_prefix.c_str(), 0.05, 200000, 4 ) );
 	}
-	
-	
 	return oa;
 };
 
@@ -83,7 +82,7 @@ void compressFile(string & file_name, string const & ref_file_name, const int nu
 	const int num_slots =
 		( ( num_workers > 1 ) ? num_workers * slots_per_worker : 1 );
 
-    Packet_courier courier(num_workers, num_slots);
+	Packet_courier courier(num_workers, num_slots);
 
 	// open output streams
 	Output_args output_args = initializeOutputStreams(file_name, seq_only, discard_secondary_alignments, &courier);

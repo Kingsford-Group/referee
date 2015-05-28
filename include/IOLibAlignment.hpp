@@ -166,8 +166,8 @@ public:
 		iter_handle = NULL;
 		while (0 == bam_aux_iter(read, &iter_handle, k3, &type, &val) ) {
 			// cerr << "called ";
-			if (k3[0] == 'M' and k3[1] == 'D') { // skip
-				// cerr << "md flag";
+			if ( (k3[0] == 'M' && k3[1] == 'D') || (k3[0]=='N' && k3[1] == 'M') || (k3[0]=='X') ) { // skip
+				// cerr << "md flag | nm"; // edit dist to ref OR md OR user flag
 			}
 			else {
 				flags.push_back(k3[0]);
@@ -175,7 +175,7 @@ public:
 				// push value
 				flags += to_string(val.i);
 				flags.push_back(' ');
-				cerr << flags << " ";
+				// cerr << flags << " ";
 			}
 		}
 		return flags;

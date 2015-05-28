@@ -13,6 +13,16 @@ public:
 
 	OffsetsStream(shared_ptr<InputBuffer> ib): offsets_in(ib) { }
 
+	void seekTo(int ref_id, int start_coord) {
+		bool is_transcript_start = false;
+		auto actual_start_coordinate = offsets_in->loadOverlappingBlock(ref_id, start_coord, is_transcript_start);
+		if (actual_start_coordinate < 0) {
+			cerr << "[ERROR] Could not navigate to the begining of the interval" << endl;
+			exit(1);
+		}
+		seekToCoord(ref_id, actual_start_coordinate, start_coord, is_transcript_start);
+	}
+
 	bool hasMoreOffsets() {
 		if (!offsets_in->hasMoreBytes() ) return false;
 		return true;
@@ -34,6 +44,10 @@ public:
 		}
 		current_transcript = stoi( string(chunk.begin(), chunk.end() ) );
 		return current_transcript;
+	}
+
+	int getCurrentOffset() {
+		return current_offset;
 	}
 
 	////////////////////////////////////////////////////////////////////////
@@ -98,6 +112,23 @@ private:
 	int current_offset = 0;
 	int delta = 0;
 	int current_transcript = -1;
+
+
+	void seekToCoord(int ref_id, int actual_start_coord, int start_coord, 
+		bool const is_transcript_start) {
+		cerr << "Seek to coord " << actual_start_coord << " " << start_coord << endl;
+		current_multiplier = 0;
+		delta = 0;
+		if (is_transcript_start) {
+			// consumes bytes describing the transcript ID
+			getNextTranscript();
+		}
+		// if actual_start_coord >= start_coord -- we did not have any alignment before this
+		// and should start with actual_start_coord
+		// TODO
+		// if actual_start_coord < start_coord -- should handle this case in Decompressor and 
+		// seek to the desired coordinate along w/ other data streams (clips, quals, edits, etc)
+	}
 };
 
 #endif

@@ -53,8 +53,8 @@ using namespace std;
 ////////////////////////////////////////////////////////////////
 class GenomicCoordinate {
 public:
-    int chromosome = -1;
-    int offset = -1;
+    int chromosome = 0;
+    int offset = 0;
 
     GenomicCoordinate() {}
 
@@ -90,7 +90,7 @@ public:
         {}
 
     void print() {
-        cerr << start.chromosome << ":" << start.offset << " to " <<
+        cerr << "Interval " << start.chromosome << ":" << start.offset << " to " <<
             end.chromosome << ":" << end.offset << endl;
     }
 };
@@ -273,6 +273,12 @@ public:
                 right = new intervalTree(rights, depth, minbucket, centerp, rightp);
             }
         }
+    }
+
+    interval getFirstInterval() {
+        if (intervals.size() > 0)
+            return intervals.front();
+        else return interval(0,0,0,-1,-1,-1);
     }
 
     void findOverlapping(K start, K stop, intervalVector& overlapping) const {

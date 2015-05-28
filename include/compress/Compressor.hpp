@@ -41,6 +41,7 @@ public:
 
 	shared_ptr<OutputBuffer> offsets_buf;
 	shared_ptr<OutputBuffer> edits_buf;
+	shared_ptr<OutputBuffer> has_edits_buf;
 	shared_ptr<OutputBuffer> left_clips_buf;
 	shared_ptr<OutputBuffer> right_clips_buf;
 	shared_ptr<OutputBuffer> ids_buf;
@@ -55,6 +56,7 @@ public:
 		offsets_buf->flush();
 		// cerr << "flush 2 ";
 		edits_buf->flush();
+		has_edits_buf->flush();
 		// cerr << "flush 3 ";
 		left_clips_buf->flush();
 		// cerr << "flush 4 ";
@@ -77,6 +79,7 @@ public:
 	void setInitialCoordinate(int chromo, int offset) {
 		offsets_buf->setInitialCoordinate(chromo, offset);
 		edits_buf->setInitialCoordinate(chromo, offset);
+		has_edits_buf->setInitialCoordinate(chromo, offset);
 		left_clips_buf->setInitialCoordinate(chromo, offset);
 		right_clips_buf->setInitialCoordinate(chromo, offset);
 
@@ -92,6 +95,7 @@ public:
 	void setLastCoordinate(int chromo, int offset) {
 		offsets_buf->setLastCoordinate(chromo, offset);
 		edits_buf->setLastCoordinate(chromo, offset);
+		has_edits_buf->setLastCoordinate(chromo, offset);
 		left_clips_buf->setLastCoordinate(chromo, offset);
 		right_clips_buf->setLastCoordinate(chromo, offset);
 
@@ -106,7 +110,11 @@ public:
 };
 
 
-
+////////////////////////////////////////////////////////////////
+//
+//
+//
+////////////////////////////////////////////////////////////////
 class Compressor {
 public:
 	////////////////////////////////////////////////////////////////
@@ -122,7 +130,6 @@ public:
 		seq_only(seq_only),
 		discard_secondary_alignments(discard_secondary) {
 		failed_ = parser.failed();
-		// TODO: check that successfully created a file parser
 	}
 
 	bool failed() {return failed_;}
@@ -169,7 +176,7 @@ public:
 
 	    // output the last offset
 	    outputPair(offset_pair, prev_ref, prev_offset);
-	    processHasEditsBits(edit_flags, file_name);
+	    // processHasEditsBits(edit_flags, file_name);
 	}
 
 ////////////////////////////////////////////////////////////////
@@ -424,7 +431,10 @@ private:
 		    }
 	    }
 	    prev_offset = offset;
-	    edit_flags.push_back(hasEdits);
+
+	    // edit_flags.push_back(hasEdits);
+	    GenomicCoordinate coord(al.ref(), al.offset());
+	    writeBool(hasEdits, out_buffers.has_edits_buf, coord);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -517,8 +527,8 @@ private:
 
 	////////////////////////////////////////////////////////////////
 	void handleOptionalFields(IOLibAlignment & al) {
+		// find MD and excise it
 		if ( !al.isPrimary() && discard_secondary_alignments ) return;
-
 		// opt_stream << al.opt_fields() << endl;
 		string opt = al.opt_fields();
 		GenomicCoordinate gc(al.ref(), al.offset());
@@ -550,7 +560,7 @@ private:
 		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), seq, al.quals(), rc);
 		// TODO: 10K - arbitrary parameter, may be as big or as small as one wants
 		if (unaligned_reads.size() >= 10000) {
-			cerr << "Used rc " << used_rc << " ";
+			// cerr << "Used rc " << used_rc << " ";
 			flushUnalignedReads();
 		}
 	}
@@ -571,38 +581,38 @@ private:
 		});
 		// write out
 		for (auto read : unaligned_reads) {
-			writeUnaligned(read, out_buffers.unaligned_buf);
+			writeUnaligned(read, seq_only, out_buffers.unaligned_buf);
 		}
 		unaligned_reads.clear();
 	}
 
-	void processHasEditsBits(vector<bool> & has_edits, string & prefix) {
-		// cerr << "TODO: save the has_edits bit vector" << endl;
-	    // writeAsRRR(has_edits, prefix);
-	    writeAsBytes(has_edits, prefix);
-	}
+	// void processHasEditsBits(vector<bool> & has_edits, string & prefix) {
+	// 	// cerr << "TODO: save the has_edits bit vector" << endl;
+	//     // writeAsRRR(has_edits, prefix);
+	//     writeAsBytes(has_edits, prefix);
+	// }
 
-	void writeAsBytes(vector<bool> & has_edits, string & prefix) {
-		size_t size = has_edits.size();
-		ofstream has_edits_out(prefix + ".has_edits");
-		/* write the number of bits we expect -- may not need this since we 
-		 have # alignments implicitly from offsets file */
-		uint8_t mask = 255;
-		has_edits_out << (uint8_t)( (size >> 24) & mask);
-		has_edits_out << (uint8_t)( (size >> 16) & mask);
-		has_edits_out << (uint8_t)( (size >> 8) & mask);
-		has_edits_out << (uint8_t)(size & mask);
-		// write out binary data as bytes
-		int num_bytes = (int)ceil(size / 8.0);
-		for (auto i = 0; i < num_bytes; i++) {
-			uint8_t byte = 0;
-			for (auto j = 0; (j < 8) && (i*8+j < size); j++) {
-				byte = (byte << 1) | has_edits[i*8 + j];
-			}
-			has_edits_out << byte;
-		}
-		has_edits_out.close();
-	}
+	// void writeAsBytes(vector<bool> & has_edits, string & prefix) {
+	// 	size_t size = has_edits.size();
+	// 	ofstream has_edits_out(prefix + ".has_edits");
+	// 	/* write the number of bits we expect -- may not need this since we 
+	// 	 have # alignments implicitly from offsets file */
+	// 	uint8_t mask = 255;
+	// 	has_edits_out << (uint8_t)( (size >> 24) & mask);
+	// 	has_edits_out << (uint8_t)( (size >> 16) & mask);
+	// 	has_edits_out << (uint8_t)( (size >> 8) & mask);
+	// 	has_edits_out << (uint8_t)(size & mask);
+	// 	// write out binary data as bytes
+	// 	int num_bytes = (int)ceil(size / 8.0);
+	// 	for (auto i = 0; i < num_bytes; i++) {
+	// 		uint8_t byte = 0;
+	// 		for (auto j = 0; (j < 8) && (i*8+j < size); j++) {
+	// 			byte = (byte << 1) | has_edits[i*8 + j];
+	// 		}
+	// 		has_edits_out << byte;
+	// 	}
+	// 	has_edits_out.close();
+	// }
 
 	/*
 	void writeAsRRR(vector<bool> & has_edits, string & prefix) {

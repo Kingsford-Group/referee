@@ -40,7 +40,7 @@ Params parseParameters(int argc, char * argv[]) {
         }
         else if ( strcmp(argv[i], "--seqOnly") == 0) {
             p.seq_only = true;
-        } 
+        }
         else if (strcmp(argv[i], "--discardSecondary") == 0) {
             p.discard_secondary_alignments = true;
         }
@@ -120,7 +120,8 @@ int main(int argc, char * argv []) {
         // Decompressor d(p.input_file, fname_out, p.ref_file);
         // d.decompress();
         // TODO: pass a region to decompress & stream out if "view" parameter is present
-        decompressFile(p.input_file, p.ref_file, fname_out, numParseThreads);
+        // decompressFile(p.input_file, p.ref_file, fname_out, numParseThreads);
+        decompressFileSequential(p.input_file, p.ref_file, fname_out);
         cerr << "Restored file written to " << fname_out << endl;
     }
     return 0;

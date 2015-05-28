@@ -47,7 +47,8 @@ public:
 	}
 
 	///////////////////////////////////////////////////////////
-	OutputBuffer(Packet_courier * c, string const & fn, string const & suff, int d = 1<<23, int match_len = 36): 
+	OutputBuffer(Packet_courier * c, string const & fn, string const & suff, 
+			int d = 1<<23, int match_len = 36): 
 		courier(c),
 		stream_suffix(suff),
 		dictionary_size(d),
@@ -69,6 +70,7 @@ public:
 	}
 
 	void setLastCoordinate(int c, int off) {
+		// cerr << stream_suffix << " last coord: " << c << ":" << off << endl;
 		endCoord.chromosome = c;
 		endCoord.offset = off;
 	}
@@ -87,6 +89,8 @@ public:
 	friend void addOffsetPair(int delta, int occur, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
 
 	friend void addUnsignedByte(uint8_t c, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+
+	friend void writeBool(bool b, shared_ptr<OutputBuffer> buf, GenomicCoordinate & coord);
 
 	friend void writeOp(const edit_pair & edit, int prev_edit_offset, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
 
@@ -110,7 +114,7 @@ public:
 
 	friend void writeOpt(string opt, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
 
-	friend void writeUnaligned(UnalignedRead & read, shared_ptr<OutputBuffer> o_str);
+	friend void writeUnaligned(UnalignedRead & read, bool seq_only, shared_ptr<OutputBuffer> o_str);
 
 	////////////////////////////////////////////////////////////////
 	// stream size
@@ -118,6 +122,7 @@ public:
 
 	void flush() {
 		// TODO: last chromosome, max coordinate
+		// cerr << "flushing " << stream_suffix << endl;
 		GenomicCoordinate g(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
 		compressAndWriteOut(g, true);
 	}
@@ -151,6 +156,7 @@ private:
 	//
 	////////////////////////////////////////////////////////////////
 	void compressAndWriteOut(GenomicCoordinate & currentCoord, bool flush_all = false) {
+		// cerr << stream_suffix << " data:" << data.size() << " D: " << dictionary_size << endl;
 		int data_size = data.size();
 		total_bytes += data_size;
 
@@ -163,7 +169,9 @@ private:
 		if (flush_all) 
 			max_size = data_size;
 		else 
-			max_size = data_size - dictionary_size;
+			max_size = (data_size / dictionary_size) * dictionary_size;
+
+		// cerr << "max packet size: " << max_size << endl;
 
 		// coord output is not set for the stream of unaligned reads
 		// and chromosome is not set if flushing data out
@@ -173,10 +181,10 @@ private:
 				endCoord.chromosome << ":" << endCoord.offset << endl;
 
 		for (int ate = 0; ate < max_size; ate += dictionary_size) {
+			// cerr << "sending the block to PLZIP" << endl;
 			int remainder = data_size - ate;
 			int size = std::min(dictionary_size, remainder);
 			uint8_t * block_data = new( std::nothrow ) uint8_t[ size ];
-			// memcpy(block_data, &(data[0]), size );
 			int i;
 			for (i = 0; i < size; i++) block_data[i] = data[i];
 			courier->receive_packet( block_data, size, out_fd ); // associate an output stream to the packet
@@ -187,7 +195,6 @@ private:
 				i++;
 				data.pop_front();
 			}
-			// data.erase(data.begin(), data.begin() + size);
 		}
 		startCoord = endCoord;
 	}
@@ -232,6 +239,11 @@ void addOffsetPair(int delta, int occur, shared_ptr<OutputBuffer> o_str, Genomic
 void addUnsignedByte(uint8_t c, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
 	o_str->data.push_back(c);
 	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+}
+
+void writeBool(bool b, shared_ptr<OutputBuffer> buf, GenomicCoordinate & coord) {
+	buf->data.push_back(b);
+	if (buf->timeToDump() ) buf->compressAndWriteOut(coord);
 }
 
 void writeOpNoOffset(const edit_pair & edit, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
@@ -321,23 +333,27 @@ void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, shared_ptr<
 	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord);
 }
 
-void writeUnaligned(UnalignedRead & read, shared_ptr<OutputBuffer> o_str) {
+void writeUnaligned(UnalignedRead & read, bool seq_only, shared_ptr<OutputBuffer> o_str) {
 	o_str->data.push_back('>');
 	// write read id
-	for (auto c : read.read_name) o_str->data.push_back(c);
-	//int len = strlen(read.read_name);
-        //for (auto i = 0; i < len; i++)
-        //        o_str->data.push_back(read.read_name[i]);
+	if (!seq_only) {
+		for (auto c : read.read_name) o_str->data.push_back(c);
+		//int len = strlen(read.read_name);
+	        //for (auto i = 0; i < len; i++)
+        	//        o_str->data.push_back(read.read_name[i]);
+	}
 	o_str->data.push_back('\n');
 	// write read seq
 	for (auto c : read.seq) o_str->data.push_back(c);
+	o_str->data.push_back('\n');
+	if (!seq_only) {
+		//write read quals
+		for (auto c : read.qual) o_str->data.push_back(c);
 		o_str->data.push_back('\n');
-	//write read quals
-	for (auto c : read.qual) o_str->data.push_back(c);
-	o_str->data.push_back('\n');
-	// strand
-	o_str->data.push_back('+');
-	o_str->data.push_back('\n');
+		// strand
+		o_str->data.push_back('+');
+		o_str->data.push_back('\n');
+	}
 	GenomicCoordinate g;	// empty coordinate
 	if (o_str->timeToDump()) o_str->compressAndWriteOut( g );
 }

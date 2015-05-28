@@ -40,7 +40,9 @@ public:
 
 	EditsStream(shared_ptr<InputBuffer> e, shared_ptr<InputBuffer> h): 
 		edits_in(e), 
-		has_edits_in(h) {}
+		has_edits_in(h) {
+			
+		}
 
 	~EditsStream() {
 		cerr << "Expected: " << alignments_expected << " observed: " << alignment_count << endl;

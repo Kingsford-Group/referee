@@ -64,14 +64,17 @@ class Decompressor {
 public:
 
 	Decompressor(
+		string const & input_fname,
 		string const & output_fname,
 		string const & ref_path):
+		file_name(input_fname),
 		output_name(output_fname),
 		ref_path(ref_path) { }
 
 	////////////////////////////////////////////////////////////////
 	// Reconstruct SAM file by combining the inputs; restoring reads and quals
 	////////////////////////////////////////////////////////////////
+	// void decompress(InputStreams & is, bool & done) {
 	void decompress(InputStreams & is, bool & done) {
 		// sequence-specific streams
 		// OffsetsStream offs(file_name);
@@ -89,6 +92,7 @@ public:
 		// ReadIDStream readIDs(file_name);
 		// FlagsStream flags(file_name/*, transcripts*/);
 		// QualityStream qualities(file_name, /* K_c */ 4); // TODO: a parameter
+
 
 		int ref_id = is.offs->getNextTranscript();
 		int i = 0;
@@ -121,6 +125,79 @@ public:
 						edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities); // TODO: add right and left clips
 				}
 				else {
+					reconstructAlignment(offset, ref_id, transcripts, is.readIDs, 
+						is.flags, is.qualities);
+				}
+			}
+			i++;
+			// if (i > 20) exit(1);
+			if (i % 1000000 == 0) {
+				cerr << i / 1000000 << "mln ";
+			}
+		}
+		cerr << endl;
+		recovered_file.close();
+	}
+
+
+	////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////
+	void decompressInterval(GenomicInterval interval, int read_len, InputStreams & is) {
+		TranscriptsStream transcripts(file_name, ref_path, "-d");
+		recovered_file.open( output_name.c_str() );
+		// TODO: check if opened successfully
+		if (!recovered_file) {
+			cerr << "[ERROR] Could not open output file." << endl;
+			exit(1);
+		}
+
+		int ref_id = interval.chromosome;
+		// TODO: can return false when no data for that interval is available
+		is.offs->seekTo(interval.chromosome, interval.start);
+		int offset = is.offs->getCurrentOffset();
+		while (offset < interval.start) {
+			is.offs->getNextOffset();
+		}
+		
+		int i = 0;
+		while ( is.offs->hasMoreOffsets() ) {
+			offset = is.offs->getNextOffset();
+			// cerr << "off " << offset << " ";
+
+			if (offset >= interval.stop) {
+				cerr << "[INFO] Reached the end of the interval" << endl;
+				return;
+			}
+
+			if (offset == END_OF_TRANS) {
+				ref_id = is.offs->getNextTranscript();
+				if (ref_id == END_OF_STREAM) {
+					cerr << "Done" << endl;
+					return;
+				}
+				cerr << "chr=" << transcripts.getMapping(ref_id) << " ";
+			}
+			else if (offset == END_OF_STREAM) {
+				// break
+				cerr << "done";
+			}
+			else {
+				// legit offset
+				// int ret = is.edits->next(); // advance to the next alignment
+				// if (ret == END_OF_STREAM) {
+				// 	cerr << "done with edits" << endl;
+				// 	// break;
+				// }
+				// // cerr << "has edit: " << edits.hasEdits() << endl;
+				// if (is.edits->hasEdits() ) {
+				// 	// extract edits
+				// 	vector<uint8_t> edit_ops = is.edits->getEdits();
+				// 	reconstructAlignment(offset, read_len, ref_id, transcripts, 
+				// 		edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities); // TODO: add right and left clips
+				// }
+				// else 
+				{
 					reconstructAlignment(offset, ref_id, transcripts, is.readIDs, 
 						is.flags, is.qualities);
 				}
@@ -175,15 +252,15 @@ private:
 //		recovered_file << read_id << "\t" << flag << "\t";
 
 		// write out reference name, offset (SAM files use 1-based offsets)
-//		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1);
-//		recovered_file << "\t" << mapq;
+		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1);
+		// recovered_file << "\t" << mapq;
 		// get read sequence
 		string read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
 		// to upper case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
 
 		// write out CIGAR string -- all matches
-//		recovered_file << "\t" << (int)read_len << "M";
+		recovered_file << "\t" << (int)read_len << "M";
 		// TODO: write out columns with quality mapping, PNEXT, ...
 //		recovered_file << "\t" << rnext << "\t" << pnext << "\t" << tlen;
 		recovered_file << "\t" << read;
