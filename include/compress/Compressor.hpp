@@ -92,19 +92,19 @@ public:
 		}
 	}
 
-	void setLastCoordinate(int chromo, int offset) {
-		offsets_buf->setLastCoordinate(chromo, offset);
-		edits_buf->setLastCoordinate(chromo, offset);
-		has_edits_buf->setLastCoordinate(chromo, offset);
-		left_clips_buf->setLastCoordinate(chromo, offset);
-		right_clips_buf->setLastCoordinate(chromo, offset);
+	void setLastCoordinate(int chromo, int offset, size_t num) {
+		offsets_buf->setLastCoordinate(chromo, offset, num);
+		edits_buf->setLastCoordinate(chromo, offset, num);
+		has_edits_buf->setLastCoordinate(chromo, offset, num);
+		left_clips_buf->setLastCoordinate(chromo, offset, num);
+		right_clips_buf->setLastCoordinate(chromo, offset, num);
 
 		if (!seq_only) {
-			ids_buf->setLastCoordinate(chromo, offset);
-			flags_buf->setLastCoordinate(chromo, offset);
+			ids_buf->setLastCoordinate(chromo, offset, num);
+			flags_buf->setLastCoordinate(chromo, offset, num);
 			// TODO
-			// quals_buf->setLastCoordinate(chromo, offset);
-			opt_buf->setLastCoordinate(chromo, offset);
+			// quals_buf->setLastCoordinate(chromo, offset, num);
+			opt_buf->setLastCoordinate(chromo, offset, num);
 		}
 	}
 };
@@ -147,7 +147,7 @@ public:
 			ref_seq_handler.setMapping(i, h->ref[i].name);
 			head_out << i << " " << h->ref[i].name << endl;
 		}
-		head_out.close();
+		
 
 		int line_id = 0;
 		IOLibAlignment last_aligned;
@@ -160,12 +160,16 @@ public:
 	        }
 	        else {
 	        	last_aligned = al;
+	        	if (first) {
+	        		head_out << "read_len=" << al.read_len() << endl;
+	        		head_out.close();
+	        	}
 	            processRead(al, first);
 	            first = false;
 	        }
 	        line_id++;
 	    }
-	    out_buffers.setLastCoordinate(last_aligned.ref(), last_aligned.offset());
+	    out_buffers.setLastCoordinate(last_aligned.ref(), last_aligned.offset(), count);
 	    flushUnalignedReads();
 	    parser.close();
 	    cerr << "Of them unaligned: " << unaligned_cnt << endl;
@@ -195,7 +199,7 @@ private:
 	bool discard_secondary_alignments = false;	// omit multimaps, record data for a given read only once
 	// TODO: strategies for choosing the alignement: smallest errors, most consistent offsets
 
-	int count = 0;
+	size_t count = 0;
 
 	// reference sequence
 	TranscriptsStream ref_seq_handler;
@@ -235,7 +239,7 @@ private:
 		// for (auto i = 0; i < clip_length; i++) lc_stream << clip_bytes[i];
 		// lc_stream << endl;
 		GenomicCoordinate g(al.ref(), al.offset() );
-		writeClip(clip_bytes, clip_length, out_buffers.left_clips_buf, g);
+		writeClip(clip_bytes, clip_length, out_buffers.left_clips_buf, g, count);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -249,7 +253,7 @@ private:
 		// for (auto i = 0; i < clip_length; i++) rc_stream << clip_bytes[i];
 		// rc_stream << endl;
 		GenomicCoordinate g(al.ref(), al.offset() );
-		writeClip(clip_bytes, clip_length, out_buffers.right_clips_buf, g);
+		writeClip(clip_bytes, clip_length, out_buffers.right_clips_buf, g, count);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -318,7 +322,7 @@ private:
 	    // edit_stream << (unsigned char)num_edit_bytes;
 	    GenomicCoordinate gc(al.ref(), al.offset() );
 
-	    addUnsignedByte(num_edit_bytes, out_buffers.edits_buf, gc);
+	    addUnsignedByte(num_edit_bytes, out_buffers.edits_buf, gc, count);
 
 	    edit_count += al.merged_edits.size();
 
@@ -327,24 +331,24 @@ private:
 	    if (al.lsc() > 0) {
 	        // edit_stream << 'L';
 	        prev_edit_offset += al.lsc();
-	        addUnsignedByte('L', out_buffers.edits_buf, gc);
+	        addUnsignedByte('L', out_buffers.edits_buf, gc, count);
 	        writeLeftClip(al);
 	    }
 	    if (al.rsc() > 0) {
 	        // edit_stream << 'R';
-	        addUnsignedByte('R', out_buffers.edits_buf, gc);
+	        addUnsignedByte('R', out_buffers.edits_buf, gc, count);
 	        writeRightClip(al);
 	    }
 	    // if (al.lhc() > 0) edit_stream << 'l' << (unsigned char)al.lhc();
 	    // if (al.rhc() > 0) edit_stream << 'r' << (unsigned char)al.rhc();
 	    if (al.lhc() > 0) {
-		    addUnsignedByte('l', out_buffers.edits_buf, gc);
-		    addUnsignedByte(al.lhc(), out_buffers.edits_buf, gc);
+		    addUnsignedByte('l', out_buffers.edits_buf, gc, count);
+		    addUnsignedByte(al.lhc(), out_buffers.edits_buf, gc, count);
 		    prev_edit_offset += al.lhc();
 		}
 		if (al.rhc() > 0) {
-		    addUnsignedByte('r', out_buffers.edits_buf, gc);
-		    addUnsignedByte(al.rhc(), out_buffers.edits_buf, gc);
+		    addUnsignedByte('r', out_buffers.edits_buf, gc, count);
+		    addUnsignedByte(al.rhc(), out_buffers.edits_buf, gc, count);
 		}
 
 		
@@ -355,7 +359,7 @@ private:
 	        	// cerr << (char) edit.edit_op << "(" << edit.edit_pos << ")";
 	            if (edit.edit_op != 'E') {
 	            	if (edit.edit_op != 'R' && edit.edit_op != 'L') {// these are handled separately
-	            		writeOp(edit, prev_edit_offset, out_buffers.edits_buf, gc);
+	            		writeOp(edit, prev_edit_offset, out_buffers.edits_buf, gc, count);
 	                	// edit_stream << (unsigned char) edit.edit_op; // edit code            
 	                	// edit_stream << (unsigned char) (edit.edit_pos - prev_edit_offset);    // record how many bases since the last edit
 	                	prev_edit_offset = edit.edit_pos;
@@ -371,11 +375,11 @@ private:
 	                // cerr << "Splice offset: " << (int)(edit.edit_pos - prev_edit_offset) << " len: " << splice_len;
 	                if (splice_len > 65535 ) {
                 		// cerr << " (long splice)" << endl;
-                		writeLongSpliceOp(edit, prev_edit_offset, splice_len, out_buffers.edits_buf, gc);
+                		writeLongSpliceOp(edit, prev_edit_offset, splice_len, out_buffers.edits_buf, gc, count);
 	                }
 	                else {
 	                	// cerr << " (short splice)" << endl;
-	                	writeSpliceOp(edit, prev_edit_offset, splice_len, out_buffers.edits_buf, gc);
+	                	writeSpliceOp(edit, prev_edit_offset, splice_len, out_buffers.edits_buf, gc, count);
 	                }
 	                prev_edit_offset = edit.edit_pos;
 	            }
@@ -389,10 +393,10 @@ private:
 		GenomicCoordinate gc(chromo_id, real_offset);
 
 		if (offset_pair.second > 1) {// offset with a multiplier
-    		addOffsetPair(offset_pair.first, offset_pair.second, out_buffers.offsets_buf, gc);
+    		addOffsetPair(offset_pair.first, offset_pair.second, out_buffers.offsets_buf, gc, count);
 		}
 		else { // offset w/o a multiplier
-			addOffset(offset_pair.first, out_buffers.offsets_buf, gc);
+			addOffset(offset_pair.first, out_buffers.offsets_buf, gc, count);
 		}
 	}
 
@@ -434,7 +438,7 @@ private:
 
 	    // edit_flags.push_back(hasEdits);
 	    GenomicCoordinate coord(al.ref(), al.offset());
-	    writeBool(hasEdits, out_buffers.has_edits_buf, coord);
+	    writeBool(hasEdits, out_buffers.has_edits_buf, coord, count);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -462,7 +466,7 @@ private:
 		rnext = rnext_map[rnext];
 
 		GenomicCoordinate gc(al.ref(), al.offset());
-		writeFlags(flags, mapq, rnext, al.pnext(), al.pnext() - al.tlen(), out_buffers.flags_buf, gc);
+		writeFlags(flags, mapq, rnext, al.pnext(), al.pnext() - al.tlen(), out_buffers.flags_buf, gc, count);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -474,7 +478,7 @@ private:
 
 		// TODO: need to transform the read IDs before passing it down to the lzip
 		GenomicCoordinate gc(al.ref(), al.offset());
-		writeName(al.read_name(), out_buffers.ids_buf, gc);
+		writeName(al.read_name(), out_buffers.ids_buf, gc, count);
 
 		// split, diff, minimize!
 		// this can make compression for read ids faster and provide marginal improvements
@@ -532,7 +536,7 @@ private:
 		// opt_stream << al.opt_fields() << endl;
 		string opt = al.opt_fields();
 		GenomicCoordinate gc(al.ref(), al.offset());
-		writeOpt(opt, out_buffers.opt_buf, gc);
+		writeOpt(opt, out_buffers.opt_buf, gc, count);
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -586,56 +590,6 @@ private:
 		unaligned_reads.clear();
 	}
 
-	// void processHasEditsBits(vector<bool> & has_edits, string & prefix) {
-	// 	// cerr << "TODO: save the has_edits bit vector" << endl;
-	//     // writeAsRRR(has_edits, prefix);
-	//     writeAsBytes(has_edits, prefix);
-	// }
-
-	// void writeAsBytes(vector<bool> & has_edits, string & prefix) {
-	// 	size_t size = has_edits.size();
-	// 	ofstream has_edits_out(prefix + ".has_edits");
-	// 	/* write the number of bits we expect -- may not need this since we 
-	// 	 have # alignments implicitly from offsets file */
-	// 	uint8_t mask = 255;
-	// 	has_edits_out << (uint8_t)( (size >> 24) & mask);
-	// 	has_edits_out << (uint8_t)( (size >> 16) & mask);
-	// 	has_edits_out << (uint8_t)( (size >> 8) & mask);
-	// 	has_edits_out << (uint8_t)(size & mask);
-	// 	// write out binary data as bytes
-	// 	int num_bytes = (int)ceil(size / 8.0);
-	// 	for (auto i = 0; i < num_bytes; i++) {
-	// 		uint8_t byte = 0;
-	// 		for (auto j = 0; (j < 8) && (i*8+j < size); j++) {
-	// 			byte = (byte << 1) | has_edits[i*8 + j];
-	// 		}
-	// 		has_edits_out << byte;
-	// 	}
-	// 	has_edits_out.close();
-	// }
-
-	/*
-	void writeAsRRR(vector<bool> & has_edits, string & prefix) {
-		uint64_t size = has_edits.size();
-	    // create bv of size bits
-	    sdsl::bit_vector bv(size);
-
-	    // set sparse bits
-	    for(uint64_t i = 0; i < size; i++) {
-	        bv[i] = has_edits[i];
-	    }
-	    //
-	    // sdsl::rrr_vector<> rrr_vec63(bv);
-	    // sdsl::rrr_vector<> rrr_vec31(bv);
-	    sdsl::rrr_vector<> rrr_vec15(bv);
-	    // sdsl::rrr_vector<> rrr_vec127(bv);
-
-	    // std::cout << "bv uses " << sdsl::size_in_mega_bytes(bv) << " MB." << std::endl;
-	    std::cout << "rrr_vec15 uses " << sdsl::size_in_mega_bytes(rrr_vec15) << " MB." << std::endl;
-	    sdsl::store_to_file(rrr_vec15, prefix + ".has_edits");
-	}
-	*/
-
 	////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
@@ -647,13 +601,12 @@ private:
 	    if (first) {
 	    	cerr << "Assuming uniform read len of " << al.read_len() << " bases" << endl;
 	    	out_buffers.setInitialCoordinate(ref, al.offset() );
-	    	writeReadLen(al.read_len(), out_buffers.edits_buf);
-	    	// edit_stream << (uint8_t)al.read_len();
+	    	// writeReadLen(al.read_len(), out_buffers.edits_buf);
 	    	prev_ref = ref;
 
 	    	// write the reference id before writing out alignment offsets
 	    	GenomicCoordinate gc(ref, al.offset());
-	    	addReference(prev_ref, first, out_buffers.offsets_buf, gc);
+	    	addReference(prev_ref, first, out_buffers.offsets_buf, gc, count);
 	    	new_transcript = true;
 	    }
 	    // starting a different chromosome -- finish the line, write out a new ref id
@@ -663,7 +616,7 @@ private:
 	    	prev_offset = 0;
 
 	    	GenomicCoordinate gc(ref, al.offset());
-	    	addReference(ref, first, out_buffers.offsets_buf, gc);
+	    	addReference(ref, first, out_buffers.offsets_buf, gc, count);
 	    	prev_ref = ref;
 	    	new_transcript = true;
 	    }
