@@ -18,6 +18,7 @@
 #ifndef PLZIP_LIB_H
 #define PLZIP_LIB_H
 
+// #include <iostream>
 #include <pthread.h>
 
 enum {
@@ -170,7 +171,11 @@ struct File_trailer
   unsigned long long member_size() const
     {
     unsigned long long tmp = 0;
-    for( int i = 19; i >= 12; --i ) { tmp <<= 8; tmp += data[i]; }
+    for (int i = 19; i >= 12; --i) { 
+      // std::cerr << "i=" << i << ",d[i]=" << (int)data[i] << " ";
+      tmp <<= 8; 
+      tmp += data[i]; 
+    }
     return tmp;
     }
 

@@ -16,15 +16,15 @@ export DYLD_LIBRARY_PATH=plzip:$DYLD_LIBRARY_PATH
 
 # DIR=/mnt/scratch0/dfilippo/aligned
 DIR=/data/referee/aligned
-FILE=SRR445718.2m.sam
-# FILE=SRR445718.sam
+# FILE=SRR445718.2m.sam
+FILE=SRR445718.sam
 # FILE=SRR1294122.sam
 # FILE=P_aeruginosa_PAO1.sam
 # GENOME=/data/referee/aligned/NC_002516.fna
 # GENOME=/data/genomes/bacterial/Pseudomonas_aeruginosa_PAO1_uid57945/NC_002516.fna
 # GENOME=/mnt/scratch0/dfilippo/genomes/deez/all_chromosomes_hg_19.fa
-# GENOME=$DIR/human_genome.fa
-GENOME=$DIR/human_chr10_37.2.fa
+GENOME=$DIR/human_genome.fa
+# GENOME=$DIR/human_chr10_37.2.fa
 # GENOME=$DIR/human_chr10.fa
 #FILE=K562_cytosol_LID8465_TopHat_v2.sam
 # FILE=NA12878_S1.sorted.sam
@@ -50,6 +50,8 @@ then
 	/usr/bin/time $TIMEOPT $BIN -d $DIR/$FILE -t $T -r $GENOME # > $DIR/$FILE.decomp.log 2>&1
 	# only compare chr, offs, cigar strings
 	# diff --suppress-common-lines -i -w -y -B <(cut -f 3,4 $DIR/$FILE) $DIR/$FILE.recovered | wc -l
+
+	wc -l $DIR/$FILE.recovered
 
 	# compare IDs
 	# echo "Compare read IDs (only for the aligned reads)"

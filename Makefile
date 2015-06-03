@@ -1,5 +1,5 @@
 CC=g++
-CFLAGS=-std=c++11 -O3 -w
+CFLAGS=-std=c++11 -std=gnu++11 -O3 -w
 # CCPARALL=-fopenmp -D_GLIBCXX_PARALLEL
 #CFLAGSLIB=-shared -fPIC
 #PLIBZ=

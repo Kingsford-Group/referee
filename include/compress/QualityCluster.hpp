@@ -152,17 +152,17 @@ public:
 		else {
 			deltas = core;
 		}
-		writeString(deltas, output_str, currentCoord);
+		writeString(deltas, output_str, currentCoord, 0);
 	}
 
 	////////////////////////////////////////////////////////////////
 	void writePrefix(string & p, GenomicCoordinate & currentCoord) {
-		writeString(p, prefix_str, currentCoord);
+		writeString(p, prefix_str, currentCoord, 0);
 	}
 
 	////////////////////////////////////////////////////////////////
 	void writeSuffix(string & s, GenomicCoordinate & currentCoord) {
-		writeString(s, suffix_str, currentCoord);
+		writeString(s, suffix_str, currentCoord, 0);
 	}
 
 	void flush() {

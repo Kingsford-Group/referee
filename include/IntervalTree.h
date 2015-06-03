@@ -69,10 +69,18 @@ public:
 ////////////////////////////////////////////////////////////////
 class TrueGenomicInterval {
 public:
+    // start genomic coordinate for this block
     GenomicCoordinate start;
+    // end genomic coordinate for this block
     GenomicCoordinate end;
+    // number of alignments seen so far before the start of this block
+    unsigned long num_alignments;
 
-    TrueGenomicInterval(const string & s) {
+    bool is_aligned;
+
+    // parse the input interval -- start and end chromosome may differ
+    TrueGenomicInterval(const string & s, unsigned long const num) {
+        num_alignments = num;
         int split = s.find('-');
         string start_s = s.substr(0, split);
         int split2 = start_s.find(':');
@@ -81,13 +89,15 @@ public:
         string end_s = s.substr(split+1);
         split2 = end_s.find(':');
         end.chromosome = stoi( end_s.substr(0, split2) );
-        end.offset = stoi( end_s.substr(split2+1) );
+        auto aligned_split = end_s.find(' ', split2+1);
+        end.offset = stoi( end_s.substr(split2+1, aligned_split) );
+        is_aligned = (end_s.back() == 't');
     }
 
-    TrueGenomicInterval(int st_c, int st_off, int end_c, int end_off): 
-        start(st_c, st_off),
-        end(end_c, end_off)
-        {}
+    // TrueGenomicInterval(int st_c, int st_off, int end_c, int end_off): 
+    //     start(st_c, st_off),
+    //     end(end_c, end_off)
+    //     {}
 
     void print() {
         cerr << "Interval " << start.chromosome << ":" << start.offset << " to " <<
@@ -119,7 +129,10 @@ class RawDataInterval : public GenomicInterval {
 private:
     bool decompressed = false;
 
+    bool is_aligned_with_transcript_start = false;
+
     std::vector<uint8_t> data;
+
 public:
     // offset from the begining of the file to where the block begins
     size_t byte_offset;
@@ -127,18 +140,26 @@ public:
     // block size, including the header and trailer
     size_t block_size;
 
+    size_t num_alignments;
+
     // expected size of the decompressed data -- available in the block trailer
     size_t decompressed_size;
 
-    RawDataInterval(size_t off, size_t size, size_t ex, int chr, int s, int e): 
+    RawDataInterval(size_t off, size_t size, size_t ex, int chr, int s, int e, unsigned long num, bool is_aligned):
         byte_offset(off), 
         block_size(size),
         decompressed_size(ex),
-        GenomicInterval(chr, s, e) {}
+        GenomicInterval(chr, s, e),
+        num_alignments(num),
+        is_aligned_with_transcript_start(is_aligned) {}
 
     void setDecompressedData(std::vector<uint8_t> & d) {
         data = d;
         decompressed = true;
+    }
+
+    bool isAlignedWithTranscriptStart() {
+        return is_aligned_with_transcript_start;
     }
 
     std::vector<uint8_t> getData() {
@@ -278,7 +299,7 @@ public:
     interval getFirstInterval() {
         if (intervals.size() > 0)
             return intervals.front();
-        else return interval(0,0,0,-1,-1,-1);
+        else return interval(0,0,0,-1,-1,-1, 0, false);
     }
 
     void findOverlapping(K start, K stop, intervalVector& overlapping) const {

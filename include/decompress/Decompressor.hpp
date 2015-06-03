@@ -22,6 +22,15 @@
 
 
 
+////////////////////////////////////////////////////////////////
+
+#define D_SEQ 				1
+#define D_FLAGS				2
+#define D_READIDS			4
+#define	D_QUALS				8
+#define D_OPTIONAL_FIELDS	16
+
+
 
 ////////////////////////////////////////////////////////////////
 //
@@ -56,6 +65,53 @@ char reverseReplace(uint8_t & c) {
 }
 
 class Decompressor {
+
+	// sync the streams
+	void sync_streams(InputStreams & is, pair<int, unsigned long> & off_block_start, 
+		pair<int, unsigned long> & edit_block_start, int target_coord) {
+		int offset_coord = off_block_start.first;
+		unsigned long offset_num_al = off_block_start.second;
+
+		int edit_coord = edit_block_start.first;
+		unsigned long edit_num_al = edit_block_start.second;
+		cerr << "of " << offset_num_al << " e " << edit_num_al << endl;
+
+		// first sync be the number of coordinates preceeding the blocks
+		cerr << "bringing edits up to speed" << endl;
+		while (edit_num_al < offset_num_al) {
+			is.edits->next(); // next has_edit byte
+			// skip edit list for this alignment if there is one
+			if (is.edits->hasEdits() ) is.edits->getEdits();
+			edit_num_al++;
+		}
+		cerr << "edit_num_al: " << edit_num_al << endl;
+		while (offset_num_al < edit_num_al) {
+			// need off to seek forward to edit_start
+			is.offs->getNextOffset();
+			offset_num_al++;
+		}
+		cerr << "offs_num_al: " << offset_num_al << endl;
+
+		// now seek to the target coordinate
+		int offset = is.offs->getCurrentOffset();
+		assert(offset_coord <= offset);
+		while (offset < target_coord) {
+			offset = is.offs->getNextOffset();
+			if (offset == END_OF_TRANS) {
+				cerr << "[ERROR] unexpected end of transcript offsets" << endl;
+				exit(1);
+			}
+			else if (offset == END_OF_STREAM) {
+				cerr << "[ERROR] unexpected end of offsets stream" << endl;
+				exit(1);
+			}
+			// advance to the next edit
+			is.edits->next();
+			if (is.edits->hasEdits() ) is.edits->getEdits();
+		}
+		cerr << "after seeking current coord is: " << offset << endl;
+	}
+
 ////////////////////////////////////////////////////////////////
 //
 //
@@ -75,7 +131,7 @@ public:
 	// Reconstruct SAM file by combining the inputs; restoring reads and quals
 	////////////////////////////////////////////////////////////////
 	// void decompress(InputStreams & is, bool & done) {
-	void decompress(InputStreams & is, bool & done) {
+	void decompress(InputStreams & is, bool & done, uint8_t options) {
 		// sequence-specific streams
 		// OffsetsStream offs(file_name);
 		// EditsStream edits(file_name);
@@ -122,11 +178,11 @@ public:
 					// extract edits
 					vector<uint8_t> edit_ops = is.edits->getEdits();
 					reconstructAlignment(offset, read_len, ref_id, transcripts, 
-						edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities); // TODO: add right and left clips
+						edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities, options); // TODO: add right and left clips
 				}
 				else {
-					reconstructAlignment(offset, ref_id, transcripts, is.readIDs, 
-						is.flags, is.qualities);
+					reconstructAlignment(offset, read_len, ref_id, transcripts, is.readIDs, 
+						is.flags, is.qualities, options);
 				}
 			}
 			i++;
@@ -142,11 +198,12 @@ public:
 
 	////////////////////////////////////////////////////////////////
 	//
+	// Decompress alignments within a given interval
+	//
 	////////////////////////////////////////////////////////////////
-	void decompressInterval(GenomicInterval interval, int read_len, InputStreams & is) {
+	void decompressInterval(GenomicInterval interval, int read_len, InputStreams & is, uint8_t options) {
 		TranscriptsStream transcripts(file_name, ref_path, "-d");
 		recovered_file.open( output_name.c_str() );
-		// TODO: check if opened successfully
 		if (!recovered_file) {
 			cerr << "[ERROR] Could not open output file." << endl;
 			exit(1);
@@ -154,19 +211,24 @@ public:
 
 		int ref_id = interval.chromosome;
 		// TODO: can return false when no data for that interval is available
-		is.offs->seekTo(interval.chromosome, interval.start);
-		int offset = is.offs->getCurrentOffset();
-		while (offset < interval.start) {
-			is.offs->getNextOffset();
-		}
+		pair<int,unsigned long> off_start_coord = is.offs->seekToBlockStart(interval.chromosome, interval.start, interval.stop);
+		assert(off_start_coord.first == is.offs->getCurrentOffset() );
+		// loads the first block overlapping he requested coordinate
+		// cerr << "Seeking to the first edit block" << endl;
+		pair<int,unsigned long> edit_start_coord = is.edits->seekToBlockStart(interval.chromosome, interval.start, interval.stop);
 		
-		int i = 0;
+		cerr << "syncing input streams" << endl;
+		sync_streams(is, off_start_coord, edit_start_coord, interval.start);
+		cerr << "STREAMS SYNCED" << endl;
+		
+		// now restore alignments
+		int i = 0, offset = 0;
 		while ( is.offs->hasMoreOffsets() ) {
 			offset = is.offs->getNextOffset();
-			// cerr << "off " << offset << " ";
+			// cerr << "current offset: " << offset << endl;
 
 			if (offset >= interval.stop) {
-				cerr << "[INFO] Reached the end of the interval" << endl;
+				cerr << "[INFO] Reached the end of the interval (" << interval.stop << " <= " << offset << ")" << endl;
 				return;
 			}
 
@@ -184,22 +246,22 @@ public:
 			}
 			else {
 				// legit offset
-				// int ret = is.edits->next(); // advance to the next alignment
-				// if (ret == END_OF_STREAM) {
-				// 	cerr << "done with edits" << endl;
-				// 	// break;
-				// }
-				// // cerr << "has edit: " << edits.hasEdits() << endl;
-				// if (is.edits->hasEdits() ) {
-				// 	// extract edits
-				// 	vector<uint8_t> edit_ops = is.edits->getEdits();
-				// 	reconstructAlignment(offset, read_len, ref_id, transcripts, 
-				// 		edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities); // TODO: add right and left clips
-				// }
-				// else 
+				int ret = is.edits->next(); // advance to the next alignment
+				if (ret == END_OF_STREAM) {
+					// cerr << "done with edits" << endl;
+					// break;
+				}
+				// cerr << "has edit: " << edits.hasEdits() << endl;
+				if (is.edits->hasEdits() ) {
+					// extract edits
+					vector<uint8_t> edit_ops = is.edits->getEdits();
+					reconstructAlignment(offset, transcripts.getReadLength(), ref_id, transcripts, 
+						edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities, options); // TODO: add right and left clips
+				}
+				else 
 				{
-					reconstructAlignment(offset, ref_id, transcripts, is.readIDs, 
-						is.flags, is.qualities);
+					reconstructAlignment(offset, transcripts.getReadLength(), ref_id, transcripts, is.readIDs, 
+						is.flags, is.qualities, options);
 				}
 			}
 			i++;
@@ -233,40 +295,55 @@ private:
 	// reconstructs read without edits
 	// TODO: fill out a iolib staden BAM record and write to a bam format
 	////////////////////////////////////////////////////////////////
-	void reconstructAlignment(int offset, int ref_id, TranscriptsStream & transcripts,
+	void reconstructAlignment(int offset, int read_len, int ref_id, TranscriptsStream & transcripts,
 			shared_ptr<ReadIDStream> read_ids,
 			shared_ptr<FlagsStream> flags,
-			shared_ptr<QualityStream> qualities) {
-		// TODO
-//		string read_id;
-//		if ( read_ids.getNextID(read_id) != SUCCESS) {
-//			cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
-//			read_id = "*";
-//		}
-//		auto alignment_flags = flags.getNextFlagSet();
-//		assert(alignment_flags.size() == 5);
-//		int flag = alignment_flags[0], mapq = alignment_flags[1], 
-//			rnext = alignment_flags[2], pnext = alignment_flags[3], 
-//			tlen = alignment_flags[4];
+			shared_ptr<QualityStream> qualities, uint8_t const options) {
 
-//		recovered_file << read_id << "\t" << flag << "\t";
+		if (options & D_READIDS) {
+			string read_id;
+			if ( read_ids->getNextID(read_id) != SUCCESS) {
+				cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
+				read_id = "*";
+			}
+			recovered_file << read_id << "\t";
+		}
+		if (options & D_FLAGS) {
+			auto alignment_flags = flags->getNextFlagSet();
+			assert(alignment_flags.size() == 5);
+			int flag = alignment_flags[0], mapq = alignment_flags[1], 
+				rnext = alignment_flags[2], pnext = alignment_flags[3], 
+				tlen = alignment_flags[4];
 
-		// write out reference name, offset (SAM files use 1-based offsets)
-		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1);
-		// recovered_file << "\t" << mapq;
+			recovered_file << flag << "\t";
+			// write out reference name, offset (SAM files use 1-based offsets)
+			recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1);
+			recovered_file << "\t" << mapq;
+					// write out CIGAR string -- all matches
+			recovered_file << "\t" << (int)read_len << "M";
+			recovered_file << "\t" << rnext << "\t" << pnext << "\t" << tlen << "\t";
+		}
+
+		
 		// get read sequence
 		string read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
 		// to upper case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
 
-		// write out CIGAR string -- all matches
-		recovered_file << "\t" << (int)read_len << "M";
-		// TODO: write out columns with quality mapping, PNEXT, ...
-//		recovered_file << "\t" << rnext << "\t" << pnext << "\t" << tlen;
-		recovered_file << "\t" << read;
+		if (options & D_SEQ) {
+			recovered_file << read;
+			if ( (options & D_QUALS) || (options & D_OPTIONAL_FIELDS) ) 
+				// more data to come -- separate
+				recovered_file << "\t";
+		}
 		// TODO: write out qual vector
-//		recovered_file << qualities.getNextQualVector();
-		// skip MD -- read has no edits
+		if (options & D_QUALS) {
+			recovered_file << qualities->getNextQualVector();
+		}
+		if (options & D_OPTIONAL_FIELDS) {
+			// skip MD -- read has no edits
+			// TODO: write out other optional fields	
+		}
 		recovered_file << endl;
 	}
 
@@ -280,36 +357,55 @@ private:
 			shared_ptr<ClipStream> right_clips,
 			shared_ptr<ReadIDStream> read_ids,
 			shared_ptr<FlagsStream> flags,
-			shared_ptr<QualityStream> qualities) {
+			shared_ptr<QualityStream> qualities,
+			uint8_t const options) {
 		// get read ID for this alignment
-/*
-		string read_id;
-		if ( read_ids.getNextID(read_id) != SUCCESS) {
-			cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
-			read_id = "*";
-		}
-		auto alignment_flags = flags.getNextFlagSet();
-		assert(alignment_flags.size() == 5);
-		int flag = alignment_flags[0], mapq = alignment_flags[1], 
-			rnext = alignment_flags[2], pnext = alignment_flags[3], 
-			tlen = alignment_flags[4];
 
-		// write out read ID, flag value
-		recovered_file << read_id << "\t" << flag << "\t";
-		// write out reference name, offset (1-based in SAMs)
-		recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) ;
-*/		string cigar, md_string = "MD:Z:";
-		string read = buildEditStrings(read_len, edits, cigar, md_string, left_clips, right_clips, offset, ref_id, transcripts);
+		if (options & D_READIDS) {
+			string read_id;
+			if ( read_ids->getNextID(read_id) != SUCCESS) {
+				cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
+				read_id = "*";
+			}
+			recovered_file << read_id << "\t";
+		}
+		int flag, mapq, rnext, pnext, tlen;
+		if (options & D_FLAGS) {
+			auto alignment_flags = flags->getNextFlagSet();
+			assert(alignment_flags.size() == 5);
+			flag = alignment_flags[0], mapq = alignment_flags[1], 
+				rnext = alignment_flags[2], pnext = alignment_flags[3], 
+				tlen = alignment_flags[4];
+			// write out read ID, flag value
+			recovered_file << flag << "\t";		
+			// write out reference name, offset (1-based in SAMs)
+			recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) ;
+		}
+
+		string cigar, md_string = "MD:Z:";
+		string read = buildEditStrings(read_len, edits, cigar, md_string, 
+			left_clips, right_clips, offset, ref_id, transcripts);
 		// TODO: need to convert? diff can ignore case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
 
-		// write out mapq value, cigar
-//		recovered_file << "\t" << mapq << "\t" << cigar << "\t" << rnext << "\t" << pnext << "\t" << tlen;
+		if (options & D_FLAGS) {
+			// write out mapq value, cigar
+			recovered_file << "\t" << mapq << "\t" << cigar << "\t" << 
+				rnext << "\t" << pnext << "\t" << tlen << "\t";
+		}
+
+
 		// write out the read sequence
-		recovered_file << "\t" << read;
-		// TODO: write out qual vector
-//		recovered_file << "\t" << qualities.getNextQualVector();
-//		recovered_file << "\t" << md_string;
+		if (options & D_SEQ) {
+			recovered_file << read << "\t";
+		}
+		if (options & D_QUALS) {
+			recovered_file << qualities->getNextQualVector() << "\t";
+		}
+		if (options & D_OPTIONAL_FIELDS) {
+			recovered_file << md_string;
+			// TODO: decompress other optional fields
+		}
 		recovered_file << endl;
 	}
 
@@ -323,6 +419,7 @@ private:
 		int offset, int ref_id, 
 		TranscriptsStream & transcripts) {
 
+		// cerr << "get reference seq ";
 		string right_cigar, right_clip, read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
 		// cerr << "Read before edits: " << read << endl;
 		int j = 0, last_md_edit_pos = 0, last_cigar_edit_pos = 0, clipped_read_len = read_len;
@@ -339,26 +436,38 @@ private:
 			switch (op) {
 				case 'L': {
 					string left_clip;
-					left_clips->getNext(left_clip);
-					// just concatenate the left clip and the read
-					read = left_clip + read.substr(0, read_len - left_clip.length());
-					// update cigar string
-					cigar += to_string(left_clip.length());
-					cigar += "S";
-					// update counters
-					last_cigar_edit_pos += left_clip.length();
-					last_abs_pos += left_clip.length();
-					offset_since_last_cigar = 0;
-					offset_since_last_md = 0;
-					last_md_edit_pos = 0;
-					clipped_read_len -= left_clip.length();
+					if (left_clips == nullptr) {
+						// clipped data not available
+						break;
+					}
+					else {
+						left_clips->getNext(left_clip);
+						// just concatenate the left clip and the read
+						read = left_clip + read.substr(0, read_len - left_clip.length());
+						// update cigar string
+						cigar += to_string(left_clip.length());
+						cigar += "S";
+						// update counters
+						last_cigar_edit_pos += left_clip.length();
+						last_abs_pos += left_clip.length();
+						offset_since_last_cigar = 0;
+						offset_since_last_md = 0;
+						last_md_edit_pos = 0;
+						clipped_read_len -= left_clip.length();
+					}
 				}
 				break;
 				case 'R': {
-					right_clips->getNext(right_clip);
-					right_cigar += to_string(right_clip.length());
-					right_cigar += "S";
-					clipped_read_len -= right_clip.length();
+					if (right_clips == nullptr) {
+						// clipped data not available
+						break;
+					}
+					else {
+						right_clips->getNext(right_clip);
+						right_cigar += to_string(right_clip.length());
+						right_cigar += "S";
+						clipped_read_len -= right_clip.length();
+					}
 				}
 				break;
 				case 'l': {

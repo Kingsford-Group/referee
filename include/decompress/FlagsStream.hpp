@@ -15,11 +15,10 @@ public:
 
 	FlagsStream(shared_ptr<InputBuffer> in) : flags_in(in) {}
 
-	int getNextFlagSet(vector<int> & flags) {
-		// TODO
+	vector<int> getNextFlagSet() {
 		vector<int> loc_flags;
 
-		if ( !flags_in->hasMoreBytes() ) return END_OF_STREAM;
+		if ( !flags_in->hasMoreBytes() ) return loc_flags;
 
 		string chunk;
 		char c = flags_in->getNextByte();
@@ -34,11 +33,10 @@ public:
 				chunk.push_back(c);
 			c = flags_in->getNextByte();
 		}
-		flags = loc_flags;
 		if (chunk.size() == 0 || c == 0) {
-			return END_OF_STREAM;
+			return loc_flags;
 		}
-		return SUCCESS;
+		return loc_flags;
 	}
 
 private:

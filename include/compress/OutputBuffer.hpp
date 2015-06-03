@@ -69,10 +69,11 @@ public:
 		startCoord.offset = off;
 	}
 
-	void setLastCoordinate(int c, int off) {
+	void setLastCoordinate(int c, int off, size_t num) {
 		// cerr << stream_suffix << " last coord: " << c << ":" << off << endl;
 		endCoord.chromosome = c;
 		endCoord.offset = off;
+		num_alignments = num;
 	}
 
 	int getFD() {return out_fd; }
@@ -82,37 +83,37 @@ public:
 	// functions for adding processed data
 	//
 	////////////////////////////////////////////////////////////////
-	friend void addReference(int ref_id, bool first, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void addReference(int ref_id, bool first, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void addOffset(int delta, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void addOffset(int delta, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void addOffsetPair(int delta, int occur, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void addOffsetPair(int delta, int occur, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void addUnsignedByte(uint8_t c, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void addUnsignedByte(uint8_t c, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeBool(bool b, shared_ptr<OutputBuffer> buf, GenomicCoordinate & coord);
+	friend void writeBool(bool b, shared_ptr<OutputBuffer> buf, GenomicCoordinate & coord, size_t num);
 
-	friend void writeOp(const edit_pair & edit, int prev_edit_offset, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeOp(const edit_pair & edit, int prev_edit_offset, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeOpNoOffset(const edit_pair & edit, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeOpNoOffset(const edit_pair & edit, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeSpliceOp(const edit_pair & edit, int prev_edit_offset, short splice_len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeSpliceOp(const edit_pair & edit, int prev_edit_offset, short splice_len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeLongSpliceOp(const edit_pair & edit, int prev_edit_offset, int splice_len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeLongSpliceOp(const edit_pair & edit, int prev_edit_offset, int splice_len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
 	friend void writeReadLen(uint8_t read_len, shared_ptr<OutputBuffer> o_str);
 
-	friend void writeQualVector(char * q, int len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeQualVector(char * q, int len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeString(string & s, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeString(string & s, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeClip(vector<uint8_t> & clip_bytes, int clip_length, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeClip(vector<uint8_t> & clip_bytes, int clip_length, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeName(char * read_name, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeName(char * read_name, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
-	friend void writeOpt(string opt, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord);
+	friend void writeOpt(string opt, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num);
 
 	friend void writeUnaligned(UnalignedRead & read, bool seq_only, shared_ptr<OutputBuffer> o_str);
 
@@ -124,12 +125,16 @@ public:
 		// TODO: last chromosome, max coordinate
 		// cerr << "flushing " << stream_suffix << endl;
 		GenomicCoordinate g(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
-		compressAndWriteOut(g, true);
+		compressAndWriteOut(g, num_alignments, true);
 	}
 
 private:
 
 	string stream_suffix;
+
+	size_t num_alignments;
+
+	size_t prev_num_alignments = 0;
 
 	GenomicCoordinate startCoord, endCoord;
 
@@ -155,7 +160,7 @@ private:
 	////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
-	void compressAndWriteOut(GenomicCoordinate & currentCoord, bool flush_all = false) {
+	void compressAndWriteOut(GenomicCoordinate & currentCoord, size_t num_alignments, bool flush_all = false) {
 		// cerr << stream_suffix << " data:" << data.size() << " D: " << dictionary_size << endl;
 		int data_size = data.size();
 		total_bytes += data_size;
@@ -176,7 +181,8 @@ private:
 		// coord output is not set for the stream of unaligned reads
 		// and chromosome is not set if flushing data out
 		if (currentCoord.chromosome != -1 && genomic_coordinates_out != nullptr)
-			(*genomic_coordinates_out) << stream_suffix << " " << startCoord.chromosome << ":" << 
+			(*genomic_coordinates_out) << stream_suffix << " " << prev_num_alignments << " " << 
+				startCoord.chromosome << ":" << 
 				startCoord.offset << "-" <<
 				endCoord.chromosome << ":" << endCoord.offset << endl;
 
@@ -197,6 +203,7 @@ private:
 			}
 		}
 		startCoord = endCoord;
+		prev_num_alignments = num_alignments;
 	}
 };
 
@@ -208,22 +215,24 @@ void writeInteger(int n, deque<uint8_t> & out) {
 ////////////////////////////////////////////////////////////////
 //
 ////////////////////////////////////////////////////////////////
-void addReference(int ref_id, bool first, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void addReference(int ref_id, bool first, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num) {
 	if (!first) o_str->data.push_back('\n');
 	writeInteger(ref_id, o_str->data);
 	o_str->data.push_back(' ');
 
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
-void addOffset(int delta, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+////////////////////////////////////////////////////////////////
+void addOffset(int delta, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num) {
 	for (auto c: to_string(delta))
 		o_str->data.push_back(c);
 	o_str->data.push_back(' ');
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
-void addOffsetPair(int delta, int occur, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {	
+////////////////////////////////////////////////////////////////
+void addOffsetPair(int delta, int occur, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num) {	
 	for (auto c : to_string(delta))
 		o_str->data.push_back(c);
 	o_str->data.push_back(':');
@@ -232,43 +241,50 @@ void addOffsetPair(int delta, int occur, shared_ptr<OutputBuffer> o_str, Genomic
 	o_str->data.push_back(' ');
 
 	if (o_str->timeToDump() ) {
-    	o_str->compressAndWriteOut(coord);
+    	o_str->compressAndWriteOut(coord, num);
     }
 }
 
-void addUnsignedByte(uint8_t c, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+////////////////////////////////////////////////////////////////
+void addUnsignedByte(uint8_t c, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num) {
 	o_str->data.push_back(c);
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
-void writeBool(bool b, shared_ptr<OutputBuffer> buf, GenomicCoordinate & coord) {
+////////////////////////////////////////////////////////////////
+void writeBool(bool b, shared_ptr<OutputBuffer> buf, GenomicCoordinate & coord, size_t num) {
 	buf->data.push_back(b);
-	if (buf->timeToDump() ) buf->compressAndWriteOut(coord);
+	if (buf->timeToDump() ) buf->compressAndWriteOut(coord, num);
 }
 
-void writeOpNoOffset(const edit_pair & edit, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeOpNoOffset(const edit_pair & edit, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num) {
 	o_str->data.push_back(edit.edit_op);
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
-void writeOp(const edit_pair & edit, int prev_edit_offset, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeOp(const edit_pair & edit, int prev_edit_offset, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num) {
 	o_str->data.push_back(edit.edit_op);
 	o_str->data.push_back(edit.edit_pos - prev_edit_offset);
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
-void writeSpliceOp(const edit_pair & edit, int prev_edit_offset, short splice_len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeSpliceOp(const edit_pair & edit, int prev_edit_offset, short splice_len, 
+		shared_ptr<OutputBuffer> o_str, 
+		GenomicCoordinate & coord, size_t num) {
 	o_str->data.push_back(edit.edit_op);
 	o_str->data.push_back(edit.edit_pos - prev_edit_offset);
 	// stream << (unsigned char) (n >> 8) << (unsigned char) (n & 255);
 	o_str->data.push_back( splice_len >> 8 );
 	o_str->data.push_back( splice_len & 255 );
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
 // uses 3 bytes to encode the splice length
 // operation code E (ascii=69) becomes ascii=197
-void writeLongSpliceOp(const edit_pair & edit, int prev_edit_offset, int splice_len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeLongSpliceOp(const edit_pair & edit, int prev_edit_offset, 
+		int splice_len, 
+		shared_ptr<OutputBuffer> o_str, 
+		GenomicCoordinate & coord, size_t num) {
 	char op = edit.edit_op | ( (int)1 << 7 );
 	o_str->data.push_back(op);
 	o_str->data.push_back(edit.edit_pos - prev_edit_offset);
@@ -276,43 +292,51 @@ void writeLongSpliceOp(const edit_pair & edit, int prev_edit_offset, int splice_
 	o_str->data.push_back( splice_len >> 16 );
 	o_str->data.push_back( splice_len >> 8 );
 	o_str->data.push_back( splice_len & 255 );
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
 void writeReadLen(uint8_t read_len, shared_ptr<OutputBuffer> o_str) {
 	o_str->data.push_back(read_len);
-	GenomicCoordinate g;
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(g);
+	// GenomicCoordinate g;
+	// if (o_str->timeToDump() ) o_str->compressAndWriteOut(g, 0);
 }
 
-void writeQualVector(char * q, int len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeQualVector(char * q, int len, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num) {
 	for (auto i = 0; i < len; i++)
 		o_str->data.push_back( (uint8_t)(q[i] + '!') );
 	o_str->data.push_back('\n');
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
-void writeClip(vector<uint8_t> & clip_bytes, int clip_length, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeClip(vector<uint8_t> & clip_bytes, 
+	int clip_length, 
+	shared_ptr<OutputBuffer> o_str, 
+	GenomicCoordinate & coord, size_t num) {
 	for (auto i = 0; i < clip_length; i++) o_str->data.push_back(clip_bytes[i]);
 	o_str->data.push_back('\n');
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
-void writeName(char * read_name, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeName(char * read_name, 
+	shared_ptr<OutputBuffer> o_str, 
+	GenomicCoordinate & coord, size_t num) {
 	int len = strlen(read_name);
 	for (auto i = 0; i < len; i++)
 		o_str->data.push_back(read_name[i]);
 	o_str->data.push_back('\n');
-	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump() ) o_str->compressAndWriteOut(coord, num);
 }
 
-void writeOpt(string opt, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeOpt(string opt, shared_ptr<OutputBuffer> o_str, 
+	GenomicCoordinate & coord, size_t num) {
 	for (auto c : opt) o_str->data.push_back(c);
 	o_str->data.push_back('\n');
-	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord, num);
 }
 
-void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, 
+	shared_ptr<OutputBuffer> o_str, 
+	GenomicCoordinate & coord, size_t num) {
 	// o_str->data.push_back( flags >> 8 );
 	// o_str->data.push_back( flags & 255 );
 	for (auto c : to_string(flags))
@@ -330,10 +354,11 @@ void writeFlags(int flags, int mapq, int rnext, int pnext, int tlen, shared_ptr<
 	for (auto c : to_string(tlen))
 		o_str->data.push_back(c);
 	o_str->data.push_back('\n');
-	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord, num);
 }
 
-void writeUnaligned(UnalignedRead & read, bool seq_only, shared_ptr<OutputBuffer> o_str) {
+void writeUnaligned(UnalignedRead & read, bool seq_only, 
+	shared_ptr<OutputBuffer> o_str) {
 	o_str->data.push_back('>');
 	// write read id
 	if (!seq_only) {
@@ -355,13 +380,13 @@ void writeUnaligned(UnalignedRead & read, bool seq_only, shared_ptr<OutputBuffer
 		o_str->data.push_back('\n');
 	}
 	GenomicCoordinate g;	// empty coordinate
-	if (o_str->timeToDump()) o_str->compressAndWriteOut( g );
+	if (o_str->timeToDump()) o_str->compressAndWriteOut(g, 0);
 }
 
-void writeString(string & s, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord) {
+void writeString(string & s, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & coord, size_t num) {
 	for (auto c : s) o_str->data.push_back(c);
 	o_str->data.push_back('\n');
-	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord);
+	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord, num);
 }
 
 #endif
