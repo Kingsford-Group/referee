@@ -9,17 +9,18 @@
 
 using namespace std;
 
+////////////////////////////////////////////////////////////////
 struct Params {
     bool decompress = false; // true for decompress, false for compress
     string input_file;  // path to the input file
-    int threads = -1;    // max number of threads to use
+    int threads = 4;    // max number of threads to use
     bool seq_only = false;
     bool discard_secondary_alignments = false;
     string ref_file;    // path to the reference sequence in *.fa format
     string location;
 };
 
-
+////////////////////////////////////////////////////////////////
 void printUsage() {
     cerr << "Referee -- separable compression for sequence alignments" << endl;
     cerr << "To compress:" << endl << 
@@ -65,7 +66,7 @@ Params parseParameters(int argc, char * argv[]) {
             i++;
             if (i >= argc) {
                 // TODO: check that arg is formatted correctly to indcate location
-                cerr << "[ERROR] Missing argument for view" << endl;
+                cerr << "[ERROR] Missing arguments for view" << endl;
                 exit(1);
             }
             p.location = argv[i];
@@ -76,7 +77,7 @@ Params parseParameters(int argc, char * argv[]) {
         }
     }
     if (argc < 3) {
-        cerr << "[ERROR] Not enough arguments" << endl;
+        cerr << "Not enough arguments" << endl;
         printUsage();
         exit(1);
     }
@@ -103,10 +104,10 @@ int main(int argc, char * argv []) {
     long max_workers = sysconf( _SC_THREAD_THREADS_MAX );
     if( max_workers < 1 || max_workers > INT_MAX / (int)sizeof (pthread_t) )
         max_workers = INT_MAX / sizeof (pthread_t);
+    // input num threads
     int numParseThreads = p.threads;
     // if parameter not provided -- take up all free threads
         numParseThreads = std::min( (long)numParseThreads, std::min( num_online, max_workers ) );
-        cerr << "Threads: " << numParseThreads << endl;
 
     if (!p.decompress) {
         ////////////////////////////////////////////////
@@ -138,7 +139,7 @@ int main(int argc, char * argv []) {
         // d.decompress();
         // TODO: pass a region to decompress & stream out if "view" parameter is present
         // decompressFile(p.input_file, p.ref_file, fname_out, numParseThreads);
-        decompressFileSequential(p.input_file, p.ref_file, fname_out);
+        decompressFileSequential(p.input_file, p.ref_file, fname_out, p.location);
         cerr << "Restored file written to " << fname_out << endl;
     }
     return 0;

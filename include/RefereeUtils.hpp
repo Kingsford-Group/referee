@@ -33,6 +33,12 @@ void check_file_open(ifstream & ref_in, string const & fname) {
   }
 }
 
+void check_file_open_silent(ifstream & ref_in, string const & fname) {
+  if (!ref_in) {
+    cerr << "[INFO] Could not open file " << fname << endl;
+  }
+}
+
 ////////////////////////////////////////////////////////////////
 void check_file_open(ofstream & f, string const & fname) {
   if (!f) {

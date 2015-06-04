@@ -34,6 +34,8 @@ class TranscriptsStream {
 
 	unordered_map<int, string> t_map;
 
+	unordered_map<string, int> reverse_map;
+
 	unordered_map<string,FaiEntry> fai_index;
 
 	unordered_map<string,size_t> ref_offsets;
@@ -183,12 +185,9 @@ class TranscriptsStream {
 	////////////////////////////////////////////////////////////////
 	unordered_map<int, string> parseTranscriptIDsPlain(string const & fname) {
 		unordered_map<int,string> t_map;
+		reverse_map.clear();
 		ifstream f_in(fname);
 		check_file_open(f_in, fname);
-		// if (!f_in) {
-		// 	cerr << "[ERROR] Reference file not found: " << fname << endl;
-		// 	exit(1);
-		// }
 		cerr << "[INFO] Reading reference sequence name mapping." << endl; 
 
 		int t_index = 0;
@@ -200,6 +199,7 @@ class TranscriptsStream {
 				t_index = stoi(type);
 				chromo = line.substr(idx+1);
 				t_map[t_index] = chromo;
+				reverse_map[chromo] = t_index;
 			}
 			else {
 				// read len
@@ -267,6 +267,10 @@ public:
 	////////////////////////////////////////////////////////////////
 	string getMapping(int ref_id) {
 		return t_map[ref_id];
+	}
+
+	int getID(string const & mapped_name) {
+		return reverse_map[mapped_name];
 	}
 
 	////////////////////////////////////////////////////////////////

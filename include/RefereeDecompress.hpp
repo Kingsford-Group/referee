@@ -28,8 +28,6 @@ void stitchAlignmentsSerial(
 	Decompressor D(input_fname, output_name, ref_name);
 	uint8_t options = 1;
 	D.decompressInterval(requested_interval, read_len, input_streams, options);
-
-	cerr << "Covered the interval (or no more alignments within the interval)" << endl;
 }
 
 /*////////////////////////////////////////////////////////////////
@@ -39,10 +37,7 @@ grouped by type of data stream
 unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>> 
 	parseGenomicIntervals(string const & fname) {
 	ifstream f_in(fname);
-	if (!f_in) {
-		cerr << "[ERROR] Could not find a mapping to genomic coordinates" << endl;
-		exit(1);
-	}
+	check_file_open(f_in, fname);
 	string line;
 	unordered_map<string, shared_ptr<vector<TrueGenomicInterval>> > map;
 	while ( getline(f_in, line) ) {
@@ -60,6 +55,29 @@ unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>>
 	return map;
 }
 
+////////////////////////////////////////////////////////////////
+//
+////////////////////////////////////////////////////////////////
+GenomicInterval parseInputInterval(string const & location) {
+	size_t idx = location.find(":");
+	if (idx == string::npos) {
+		cerr << "[ERROR] Can not parse the input interval. Expected format: chr2:5000000-100000000" << endl;
+		exit(1);
+	}
+	int chr = stoi( location.substr(0, idx).substr(3) );
+	size_t idx2 = location.find('-', idx);
+	if (idx2 == string::npos) {
+		cerr << "[ERROR] Can not parse the input interval. Expected format: chr2:5000000-100000000" << endl;
+		exit(1);
+	}
+	int start_coord = stoi( location.substr(idx+1, idx2 - idx) );
+	int end_coord = stoi( location.substr(idx2+1) );
+
+	cerr << chr << " " << start_coord << " " << end_coord << endl;
+
+	return GenomicInterval(chr, start_coord, end_coord);
+}
+
 
 ////////////////////////////////////////////////////////////////
 //
@@ -67,7 +85,7 @@ unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>>
 //
 ////////////////////////////////////////////////////////////////
 int decompressFileSequential(string const & file_name, string const & ref_file_name, 
-	string const & fname_out) {
+	string const & fname_out, string const & location) {
 
 	// set up inputs
 	unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>> all_intervals = 
@@ -107,11 +125,19 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 		}
 	}
 
-	// input interval: the one that needs to be decompressed
-	GenomicInterval requested_interval(0, 0, 10000000);
-	// 100mbp - 105mbp --spans blocks for has_edits
-	// GenomicInterval requested_interval(0, 100000000, 105000000);
-	stitchAlignmentsSerial(input_streams, requested_interval, file_name, fname_out, ref_file_name);
+	if (location.size() > 0) {
+		// parse location str
+		GenomicInterval requested_interval = parseInputInterval(location);
+		// 100mbp - 105mbp --spans blocks for has_edits
+		// GenomicInterval requested_interval(0, 100000000, 105000000);
+		stitchAlignmentsSerial(input_streams, requested_interval, file_name, fname_out, ref_file_name);
+	}
+	else {
+		// keep stitching alignments while there is data available
+		int read_len = 100;
+		Decompressor D(file_name, fname_out, ref_file_name);
+		D.decompress(read_len, input_streams, D_SEQ);
+	}
 }
 
 #endif

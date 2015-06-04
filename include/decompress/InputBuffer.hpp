@@ -57,7 +57,6 @@ public:
 //
 ////////////////////////////////////////////////////////////////
 vector<uint8_t> unzipData(shared_ptr<vector<uint8_t>> raw_data, int const new_data_size) {
-	// cerr << "Unzipping LZIP block expected size: " << new_data_size << endl;
 	vector<uint8_t> unzipped_data(new_data_size, 0); // allocate needed amount of bytes
 
 	// prepare a decoder stream
@@ -71,18 +70,7 @@ vector<uint8_t> unzipData(shared_ptr<vector<uint8_t>> raw_data, int const new_da
 	int chunk_size = LZ_decompress_write_size( decoder );
 	assert(chunk_size > 0);
 	chunk_size = std::min( chunk_size, need_to_write);
-	// cerr << "Can write " << chunk_size << " need to write " << need_to_write << endl;
-
-
-	int nz = 0;
-	// cerr << "magic: " << (*raw_data)[0] << (*raw_data)[1] << (*raw_data)[2] << 
-	// 	(*raw_data)[3] << 
-	// 	" version: " << (int)(*raw_data)[4] << 
-	// 	" coded_dict_size: " << (int)(*raw_data)[5] << endl;
-	// for (auto c : *raw_data)
-	// 	nz += (c > 0);
-	// cerr << "block has: " << nz << " non-zero entries" << endl;
-
+	
 	bool trailing_garbage_found = false;
 	while (wrote < need_to_write && !trailing_garbage_found && (chunk_size > 0) ) {
 		int written = LZ_decompress_write( decoder, (uint8_t *) &(*raw_data)[wrote], chunk_size );
@@ -95,51 +83,17 @@ vector<uint8_t> unzipData(shared_ptr<vector<uint8_t>> raw_data, int const new_da
 			exit(1);	
 		}
 		wrote += written;
-		// cerr << "wrote " << written << " ";
-
 		int read = LZ_decompress_read( decoder, (uint8_t *) &unzipped_data[bytes_read], new_data_size - bytes_read );
 		bytes_read += read;
-		// cerr << "read " << read << " ";
-
 		chunk_size = LZ_decompress_write_size( decoder );
 	}
-	// cerr << "total bytes written: " << wrote << " total bytes read: " << bytes_read << endl;
 	assert( wrote >= need_to_write );
 	assert(bytes_read == new_data_size);
-
-	// int read = LZ_decompress_read( decoder, (uint8_t *) &unzipped_data[bytes_read], new_data_size - bytes_read );
-	// cerr << " read " << read << " ";
-	// if( read < 0 ) {
-	// 	if( LZ_decompress_errno( decoder ) == LZ_header_error ) {
-	// 		cerr << "sync to memebr ";
-	// 		LZ_decompress_sync_to_member( decoder );
-	// 		int read = LZ_decompress_read( decoder, (uint8_t *) &unzipped_data[bytes_read], new_data_size - bytes_read );
-	// 		cerr << " read2 " << read << " ";
- //        	// trailing_garbage_found = true;
- //        }
- //        else {
-	// 		cerr << "[ERROR] LZIP decompress error" << endl;
-	// 		exit(1);
-	// 	}
-	// }
 	
 	LZ_decompress_finish( decoder );
-
 	auto retval = LZ_decompress_finished( decoder );
 	// destroys all internal data
 	LZ_decompress_close( decoder );
-
-	nz = 0;
-	for (auto c : unzipped_data) nz += (c > 0);
-
-	// cerr << "Data: nz=" << nz << " ";
-	// for (int i = 0; i < 200; i++) cerr << unzipped_data[i];
-	// 	cerr << endl;
-
-	// TODO: might be better to keep around a decoder if set up is expensive
-	// LZ_decompress_reset( decoder );	// prepare for new member
-
-	// cerr << "unzipped" << endl;
 	return unzipped_data;
 }
 
@@ -157,7 +111,6 @@ class InputBuffer {
 	string name;
 
 	unordered_map<chromo_id_t, IntervalTree<int,int> > chromosome_trees;
-	// unordered_map<chromo_id_t, IntervalTree<int,vector<uint8_t> > > unzipped_data_trees;
 
 	int buffer_id;
 
@@ -170,26 +123,7 @@ class InputBuffer {
 	// (mostly consists of bytes from the most recently decompressed block)
 	deque<uint8_t> bytes;
 
-	// File_index file_index;
-
 	int buffer_size;
-
-	////////////////////////////////////////////////////////////////
-	// void readMore() {
-	// 	cerr << name << " readMore" << endl;
-	// 	// TODO: when need to read more have a worker thread read more bytes from an
-	// 	// appropriate stream
-	// 	// decompress 
-	// 	// add decompressed bytes to this buffer
-	// 	vector<uint8_t> chunk(buffer_size, 0);
-	// 	f_in.read( (char *) &chunk[0], buffer_size);
-	// 	int actually_read = f_in.gcount();
-	// 	if (actually_read < buffer_size) {
-	// 		// cerr << "Requested " << buffer_size << ", got " << actually_read << endl;
-	// 	}
-	// 	for (auto c : chunk)
-	// 		bytes.push_back(c);
-	// }
 
 	void readMoreLZIPBlocks() {
 		if (block_queue.size() > 0) {
@@ -215,10 +149,6 @@ class InputBuffer {
 		// length of file
 		int64_t file_len, pos, total = 0;
 		file_len = pos = f_in.tellg();
-		// shift by trailer::size
-		// f_in.seekg( -File_trailer::size, f_in.cur);
-		// total += File_trailer::size;
-		// cerr << "file len: " << file_len << " pos = " << pos << endl;
 
 		File_header header;
   		File_trailer trailer;
@@ -227,23 +157,13 @@ class InputBuffer {
   		while (pos > 0) {
   			f_in.seekg( -member_size - File_trailer::size, f_in.cur);
   			// read trailer
-  			// cerr << "tellg: " << f_in.tellg() << " tr_s: " << File_trailer::size << " ";
-  			// f_in.clear();
-			// set absolute position relative to the begining of the file
-			
 			f_in.read( (char *) trailer.data, File_trailer::size);
 			// block size
 			member_size = trailer.member_size();
 			auto data_size = trailer.data_size();
-			// cerr << " m: " << member_size << " d: " << data_size;
-			// if (pos > member_size)
-				pos -= member_size;
-			// else pos = 0;
+			pos -= member_size;
 			total += member_size;
 			blocks.emplace_back(member_size, data_size, pos);
-			// cerr << " tr_s2:" << File_trailer::size << " tellg2: " << f_in.tellg() << endl;
-			
-			
 			try {
 				// cerr << f_in.good() << " " << f_in.fail() << " " <<
 					// f_in.bad() << " " << f_in.eof() << endl;
@@ -252,15 +172,15 @@ class InputBuffer {
 			catch (const std::ios_base::failure & e) {
 				cerr << "[ERROR] Input error: " << e.what() << " " << /*e.code() <<*/ endl;
 			}
-			// cerr << " tellg3: " << f_in.tellg() << endl;
 		}
-		// cerr << "..." << name.substr(name.size() - 10) << 
-			// " File len: " << file_len << " byte seen: " << total << endl;
 		assert(total == file_len);
 		reverse( blocks.begin(), blocks.end() );
 		return blocks;
 	}
 
+	////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////
 	vector<uint8_t> decompressBlock(RawDataInterval & block) {
 		// read block bytes from the LZ stream
 		// different non-C++11 compliant compilers may set failbit upon reaching eof
@@ -280,8 +200,6 @@ class InputBuffer {
 		f_in.read( (char *) &(*raw_bytes)[0], block.block_size);
 		auto unzipped_data = unzipData(raw_bytes, block.decompressed_size);
 		cerr << name << ": decompressed " << block.decompressed_size << " bytes" << endl;
-		// cerr << block.start << endl;
-		// cerr << "alignm: " << block.num_alignments << endl;
 		return unzipped_data;
 	}
 
@@ -291,10 +209,8 @@ class InputBuffer {
 	void createTree(int const chromo, 
 		vector<RawDataInterval> & chromo_intervals, 
 		unordered_map<chromo_id_t, IntervalTree<int,int> > & chromosome_trees) {
-		// cerr << "creating tree for chromo " << chromo << endl;
 		chromosome_trees[chromo] = 
 				IntervalTree<int,int>(chromo_intervals);
-		// cerr << "Chromosome tree: " << chromosome_trees.size();
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -378,20 +294,11 @@ public:
 		name(fname),
 		buffer_size(bs),
 		f_in(fname.c_str(), ifstream::in | ios::binary | ios::ate)  {
-			// f_in = open(fname.c_str(), ifstream::in);
-			if (!f_in) {
-				cerr << "[INFO] Could not open file: " << fname << endl;
-				return;
-			}
-
+		check_file_open_silent(f_in, fname);
 		// interval trees -- one per chromosome
 		// fill out chromosome_trees
-		cerr << name << endl;
 		auto lzip_blocks = seek_blocks(f_in);
-		// cerr << fname << " lzip blocks: " << lzip_blocks.size();
-		// cerr << " building trees... ";
 		createChromosomeIntervalTree(genomic_intervals, lzip_blocks, chromosome_trees);
-		// cerr << "trees: " << chromosome_trees.size() << endl;
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -444,58 +351,53 @@ public:
 		return make_pair(-1, 0);
 	}
 
-	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	// returns true if file is open and more bytes are available for reading
-	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	bool opened() {return f_in.is_open();}
 
-	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	//
-	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	bool hasMoreBytes() {
 		// f_in.peek(); // peek -- will set the eof bits if reached the end of file
 		// return bytes.size() > 0 || ( !no_blocks && f_in.good() ); // either have bytes in the buffer or have not reached eof
 		return bytes.size() > 0 || block_queue.size() > 0;
 	}
 
-	////////////////////////////////////////////////////////////////
-	// make this a blocking function -- if stuff not yet available
-	// wait for LZIP to decompress it
-	// potential for deadlock?
-	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
+	// stream next byte out, if no bytes available -- try to read more 
+	// (decompress if necessary) 
+	////////////////////////////////////////////////////////////////////////////
 	uint8_t getNextByte() {
 		if (bytes.size() < 1) {
 			readMoreLZIPBlocks();
 		}
 		uint8_t c = bytes.front();
 		bytes.pop_front();
-		// current_index++;
 		return c;
 	}
 
-	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	vector<uint8_t> getNextNBytes(int n) {
 		if (bytes.size() < n) {
 			readMoreLZIPBlocks();
 		}
 		vector<uint8_t> local_bytes;
-		// for (int i = 0; i < n && i < bytes.size(); i++) {
 		while (n > 0 && bytes.size() > 0) {
 			local_bytes.push_back(bytes.front());
 			bytes.pop_front();
-			// current_index++;
 			n--;
 		}
 		return local_bytes;
 	}
 
-	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	void popNBytes(int n) {
 		if (bytes.size() < n) readMoreLZIPBlocks();
 
 		while (n > 0 && bytes.size() > 0) {
 			bytes.pop_front();
-			// current_index++;
 			n--;
 		}
 	}

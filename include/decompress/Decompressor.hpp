@@ -119,7 +119,7 @@ public:
 	////////////////////////////////////////////////////////////////////////////
 	// Reconstruct SAM file by combining the inputs; restoring reads and quals
 	////////////////////////////////////////////////////////////////////////////
-	void decompress(InputStreams & is, bool & done, uint8_t const options) {
+	void decompress(int read_len, InputStreams & is, uint8_t const options) {
 		// sequence-specific streams
 		read_len = is.edits->getReadLen();
 		cerr << "Read length:\t" << (int)read_len << endl;
@@ -129,7 +129,7 @@ public:
 
 		int ref_id = is.offs->getNextTranscript();
 		int i = 0;
-		while ( is.offs->hasMoreOffsets() || !done) {
+		while ( is.offs->hasMoreOffsets() ) {
 			int offset = is.offs->getNextOffset();
 			if (offset == END_OF_TRANS) {
 				// remove the prev transcript sequence -- will not need it anymore
@@ -186,6 +186,7 @@ public:
 			exit(1);
 		}
 
+		interval.chromosome = transcripts.getID(to_string(interval.chromosome) );
 		int ref_id = interval.chromosome;
 		// TODO: can return false when no data for that interval is available
 		pair<int,unsigned long> off_start_coord = is.offs->seekToBlockStart(interval.chromosome, interval.start, interval.stop);

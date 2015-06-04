@@ -24,9 +24,9 @@ private:
 
 	size_t alignments_expected = 0;
 
-	//////////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	// 
-	//////////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	pair<int,unsigned long> syncEditStreams(pair<int, unsigned long> & edits_start, 
 		pair<int, unsigned long> & has_edits_start) {
 		int edit_start_coord = edits_start.first;
@@ -38,6 +38,7 @@ private:
 		// less than or equal to the earliest edits genomic coordinate
 		// while (edit_num_al < has_edit_num_al) {
 		// }
+		cerr << edit_num_al << " vs " << has_edits_num_al << endl;
 		assert(edit_num_al >= has_edits_num_al);
 
 		while (has_edits_num_al < edit_num_al) {
@@ -54,23 +55,23 @@ private:
 
 public:
 
-	//////////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	EditsStream(shared_ptr<InputBuffer> e, shared_ptr<InputBuffer> h): 
 		edits_in(e), 
 		has_edits_in(h) {
 		}
 
-	//////////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	~EditsStream() {
 		cerr << "Expected: " << alignments_expected << " observed: " << alignment_count << endl;
 		// assert(alignment_count == alignments_expected);
 	}
 
-	//////////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	// Loads the first block of data that overlapping the coordinate and syncs the underlying
 	// data streams to point at the same starting alignment at genomic coordinate less than or
 	// equal to the input (target) coordinate
-	//////////////////////////////////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	pair<int, unsigned long> seekToBlockStart(int const ref_id, int const start_coord, int const end_coord) {
 		bool transcript_start = false;
 		auto edits_start = edits_in->loadOverlappingBlock(ref_id, start_coord, end_coord, transcript_start);
@@ -97,39 +98,17 @@ public:
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	vector<uint8_t> getEdits() {
-		// cerr << "Bytes read before polling more: " << bytes_read << " vs. " << edits_in->current_index << endl;
 		uint8_t num_edit_bytes = edits_in->getNextByte();
 		bytes_read++;
 		auto e = edits_in->getNextNBytes(num_edit_bytes);
 		bytes_read += num_edit_bytes;
-		// cerr << "Edit seq len: " << (int)num_edit_bytes << " bytes_read " << bytes_read << endl;
 		assert(e.size() == num_edit_bytes);
 		return e;
 	}
 
-
 	bool hasEdits() {
-		// cerr << "Edit byte: " << (int)has_edit_byte << " i=" << (int)i << endl;
-		// bit version
-		// return (has_edit_byte >> i) & 1;
-		// byte version
 		return (has_edit_byte != 0);
 	}
-
-	// bit version
-	// int next() {
-	// 	alignment_count++;
-	// 	i--;
-	// 	// cerr << "NEXT i=" << (int)i << endl;
-	// 	if (i < 0) {
-	// 		if ( !has_edits_in->hasMoreBytes() ) {
-	// 			return END_OF_STREAM;
-	// 		}
-	// 		has_edit_byte = has_edits_in->getNextByte();
-	// 		i = sizeof(has_edit_byte) * 8 - 1;
-	// 	}
-	// 	return SUCCESS;
-	// }
 
 	// byte version 
 	int next() {
