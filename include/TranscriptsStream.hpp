@@ -7,6 +7,13 @@
 
 const string separator = "\t\s ";
 
+void check_file_open(ifstream & ref_in, string const & fname) {
+	if (!ref_in) {
+		cerr << "[ERROR] Could not open file " << fname << endl;
+		exit(1);
+	}
+}
+
 class TranscriptsStream {
 
 	////////////////////////////////////////////////////////////////
@@ -43,14 +50,102 @@ class TranscriptsStream {
 	int read_len = 0;
 
 	////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////
+	void indexFile(string const & fname, unordered_map<string,FaiEntry> & map) {
+		ifstream f_in(fname);
+		check_file_open(f_in, fname);
+		// get file length
+		f_in.seekg(0, f_in.end);
+		size_t flen = f_in.tellg();
+		f_in.seekg(0, f_in.beg);
+
+		int bp_per_line = 0;
+		int bytes_per_line = 0;
+		ofstream fai_out(fname + ".fai");
+		
+		int block_size = pow(2,20);
+		vector<uint8_t> buf( block_size );
+		size_t bytes_read = 0;
+		
+		int64_t num_bases = 0, byte_offset = 0;
+		string ref_name = "";
+		// read all bytes in the file
+		while (bytes_read < flen) {
+			f_in.read( (char *) &buf[0], block_size);
+			auto actually_read = f_in.gcount();
+			bytes_read += actually_read;
+			int i = 0;
+			while (i < actually_read) {
+				// new transcript
+				if (buf[i] == '>') {
+					if (i > 1) {
+						// this is not the first first >
+						map.insert( make_pair(ref_name, 
+							FaiEntry(ref_name, num_bases, byte_offset, bp_per_line, bytes_per_line) ) );
+						// write out details of the previous trancsript
+						fai_out << ref_name << "\t" << num_bases << "\t" << byte_offset << "\t" << 
+							bp_per_line << "\t" << bytes_per_line << endl;
+					}
+					// find end of line, get ref_name
+					i++; // skip '>'
+					ref_name = "";
+					while (buf[i] != '\n') {
+						if (buf[i] == ' ') break;
+						ref_name.push_back(buf[i]);
+						i++;
+					}
+					i++; // skip end of line
+					// past the header line -- here is where base sequence starts
+					byte_offset = f_in.tellg();
+					byte_offset -= (block_size - i);
+					num_bases = 0;
+					bp_per_line = 0;
+					bytes_per_line = 0;
+					while (buf[i] != '\n') {
+						if ( isalpha(buf[i]) ) {
+							bp_per_line++;
+							num_bases++;
+						}
+						i++;
+						bytes_per_line++;
+					}
+					bytes_per_line++;
+					// done estimating bases and bytes per line
+ 				}
+				else {
+					if ( isalpha(buf[i]) ) {
+						num_bases++;
+					}
+				}
+				i++;
+			}
+			buf.clear();
+		}
+		// write out data for the last transcript
+		int lines = (int) ceil ( (double) num_bases / bp_per_line );
+		int newline_chars = bytes_per_line - bp_per_line;
+		byte_offset = flen - (num_bases + newline_chars * lines);
+		map.insert( make_pair(ref_name, 
+				FaiEntry(ref_name, num_bases, byte_offset, bp_per_line, bytes_per_line) 
+			) );
+		fai_out << ref_name << "\t" << num_bases << "\t" << byte_offset << "\t" << 
+			bp_per_line << "\t" << bytes_per_line << endl;
+
+		fai_out.close();
+	}
+
+	////////////////////////////////////////////////////////////////
 	// read index for the reference and stores offsets
 	////////////////////////////////////////////////////////////////	
 	unordered_map<string,FaiEntry> readFAI(string const & fname) {
 		unordered_map<string,FaiEntry> fai_index;
-		ifstream fai_in(fname);
+		ifstream fai_in(fname + ".fai");
 		if (!fai_in) {
-			cerr << "[INFO] " << fname << " reference index not found. Creating one..." << endl;
-			// TODO: fill out ref_offsets
+			cerr << "[INFO] " << fname << " .fai reference index not found. Creating one..." << endl;
+			fai_index.clear();
+			indexFile(fname, fai_index);
+			cerr << "[INFO] Index written to " << fname << ".fai" << endl;
 		}
 		else {
 			// read it in
@@ -87,46 +182,11 @@ class TranscriptsStream {
 						FaiEntry(ref_name, n, b, bp, bytes)
 						) );
 			}
-			cerr << "Fai index size: " << fai_index.size() << endl;
+			fai_in.close();
 		}
+		cerr << "Found " << fai_index.size() << " index entries" << endl;
 		return fai_index;
 	}
-
-	////////////////////////////////////////////////////////////////
-	// TODO: parse using libstaden
-	// mapping from ref_id to a reference_name (e.g. 0 -> chr10)
-	////////////////////////////////////////////////////////////////
-	// unordered_map<int, string> parseTranscriptIDs(string const & fname) {
-	// 	unordered_map<int,string> t_map;
-	// 	ifstream f_in(fname);
-	// 	if (!f_in) {
-	// 		cerr << "[ERROR] Reference file not found: " << fname << endl;
-	// 		exit(1);
-	// 	}
-	// 	cerr << "[INFO] Reading reference sequence name mapping." << endl; 
-
-	// 	int t_index = 0;
-	// 	string line, t_name, type, chromo;
-	// 	while (getline(f_in, line)) {
-	// 		// cerr << line << endl;
-	// 		auto idx = line.find_first_of(separator);
-	// 		type = line.substr(0, idx);
-	// 		if (type.compare("@SQ") == 0) { // reference sequence line
-	// 			idx = line.find_first_not_of(separator, idx);
-	// 			auto idx2 = line.find_first_of(separator, idx);
-	// 			chromo = line.substr(idx, idx2 - idx);
-	// 			auto mid = chromo.find(":");
-	// 			t_name = chromo.substr(mid+1, idx2 - idx - mid);
-	// 			// t_map[t_name] = t_index;
-	// 			t_map[t_index] = t_name;
-	// 			cerr << "Reference " << t_name << "\t->\t" << t_index << endl;
-	// 			t_index++;
-	// 		}
-	// 	}
-
-	// 	f_in.close();
-	// 	return t_map;
-	// }
 
 	////////////////////////////////////////////////////////////////
 	// TODO: parse using libstaden
@@ -135,10 +195,11 @@ class TranscriptsStream {
 	unordered_map<int, string> parseTranscriptIDsPlain(string const & fname) {
 		unordered_map<int,string> t_map;
 		ifstream f_in(fname);
-		if (!f_in) {
-			cerr << "[ERROR] Reference file not found: " << fname << endl;
-			exit(1);
-		}
+		check_file_open(f_in, fname);
+		// if (!f_in) {
+		// 	cerr << "[ERROR] Reference file not found: " << fname << endl;
+		// 	exit(1);
+		// }
 		cerr << "[INFO] Reading reference sequence name mapping." << endl; 
 
 		int t_index = 0;
@@ -150,7 +211,6 @@ class TranscriptsStream {
 				t_index = stoi(type);
 				chromo = line.substr(idx+1);
 				t_map[t_index] = chromo;
-				// cerr << "Reference " << chromo << "\t->\t" << t_index << endl;
 			}
 			else {
 				// read len
@@ -158,7 +218,6 @@ class TranscriptsStream {
 				read_len = stoi(line.substr(idx+1));
 			}
 		}
-
 		f_in.close();
 		return t_map;
 	}
@@ -191,6 +250,8 @@ class TranscriptsStream {
 	}
 
 	////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////
 	shared_ptr<string> readTranscriptSequence(string const & ref_name, FaiEntry & entry) {
 		ifstream f_in(ref_name);
 		if (!f_in) {
@@ -200,44 +261,28 @@ class TranscriptsStream {
 		int num_lines = (int) ceil( (double)entry.num_bases / entry.bases_per_line );
 		int newline_chars = entry.bytes_per_line - entry.bases_per_line;
 		int bytes_to_read = entry.num_bases + num_lines * newline_chars;
-		cerr << ref_name << ": bases " << entry.num_bases << " bytes to read " << bytes_to_read << endl;
+		// cerr << ref_name << ": bases " << entry.num_bases << " bytes to read " << bytes_to_read << endl;
 		assert( entry.num_bases <= bytes_to_read);
 		vector<char> S(bytes_to_read, 0);			// initialize a vector that is long enough
 		f_in.seekg(entry.byte_offset);				// seek to the first base
 		f_in.read( (char*)&S[0], bytes_to_read);	// read all bytes representing the sequence
 
-		// TODO: remove newline characters
+		// remove newline characters
 		auto start_time = chrono::system_clock::now();
-		// int i = 0, prev_i = 0, N = bytes_to_read;
-		// string str;
-		// while (i < N) {
-		// 	if ( isalpha(S[i]) ) {
-		// 		i++;
-		// 	}
-		// 	else {
-		// 		str.append(S.begin() + prev_i, S.begin() + i);
-		// 		i += newline_chars;
-		// 		prev_i = i;
-		// 	}
-		// }
-		int i = bytes_to_read - 1, prev_i = i;
+		int i = 0, prev_i = 0, N = bytes_to_read;
 		string str;
-		while (i >= 0) {
+		while (i < N) {
 			if ( isalpha(S[i]) ) {
-				i--;
+				i++;
 			}
 			else {
-				for (auto it = S.begin() + prev_i; it != S.begin() + i; i--)
-					str.push_back(c);
-				// pop these chars off
-				i -= newline_chars;
+				str.append(S.begin() + prev_i, S.begin() + i);
+				i += newline_chars;
 				prev_i = i;
 			}
 		}
-		reverse(str.begin(), str.end() );
 		auto end_time = chrono::system_clock::now();
-		cerr << "Trimming newlines: " << chrono::duration_cast<chrono::microseconds>(end_time - start_time).count() << " us" << endl;
-		cerr << "Sequence len: " << str.size() << endl;
+		assert(str.size() == entry.num_bases);
 		// append to the prev line
 		return make_shared<string>(str);
 	}
@@ -254,7 +299,7 @@ public:
 			t_map = parseTranscriptIDsPlain(file_name + ".head");	
 			// TODO: also: read dictionaries for the flags
 		}
-		fai_index = readFAI(ref + ".fai");
+		fai_index = readFAI(ref);
 		// reads all sequences into memory at once
 		// ref_sequence = parseTranscripts(ref_path);
 	}

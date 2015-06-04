@@ -47,6 +47,7 @@ then
 	# plzip -fd $DIR/$FILE.*clip.lz 2> /dev/null
 	# plzip -fd $DIR/$FILE.has_edits.lz 2> /dev/null
 	# plzip -fd $DIR/$FILE.*.lz 2> /dev/null
+	# rm $GENOME.fai
 	/usr/bin/time $TIMEOPT $BIN -d $DIR/$FILE -t $T -r $GENOME # > $DIR/$FILE.decomp.log 2>&1
 	# only compare chr, offs, cigar strings
 	# diff --suppress-common-lines -i -w -y -B <(cut -f 3,4 $DIR/$FILE) $DIR/$FILE.recovered | wc -l

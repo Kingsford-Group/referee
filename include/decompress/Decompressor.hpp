@@ -155,6 +155,9 @@ public:
 		while ( is.offs->hasMoreOffsets() || !done) {
 			int offset = is.offs->getNextOffset();
 			if (offset == END_OF_TRANS) {
+				// remove the prev transcript sequence -- will not need it anymore
+				transcripts.dropTranscriptSequence(ref_id);
+				// pull the next transcript -- seq will be loaded on first access
 				ref_id = is.offs->getNextTranscript();
 				if (ref_id == END_OF_STREAM) {
 					cerr << "Done" << endl;

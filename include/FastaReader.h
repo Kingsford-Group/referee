@@ -13,21 +13,25 @@ KSEQ_INIT(int, read)
 #endif
 
 class FastaReader {
-    private:
-    int fp; // file handler
+    FILE * fp;
+    // int fp; // file handler
     kseq_t *seq;
     int l;
 
-    public:
+public:
 
-    FastaReader(char * fname) {
-        fp = open(fname, O_RDONLY); // TODO: check params
-        seq = kseq_init(fp);
+    FastaReader(const char * fname) {
+        fp = fopen(fname, "r"); // TODO: check params
+        if (fp == NULL) {
+            printf("Could not open file %s\n", fname);
+            return;
+        }
+        seq = kseq_init( fileno(fp) );
     }
 
     ~FastaReader() {
         kseq_destroy(seq);
-	close(fp);
+        fclose( fp );
     }
 
     kseq_t * nextSequence() {
@@ -35,7 +39,6 @@ class FastaReader {
         if (l < 0) return NULL;
         else return seq;
     }
-
 };
 
 #endif /* FASTA_READER_H */
