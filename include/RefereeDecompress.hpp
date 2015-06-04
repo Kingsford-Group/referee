@@ -111,7 +111,6 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 	GenomicInterval requested_interval(0, 0, 10000000);
 	// 100mbp - 105mbp --spans blocks for has_edits
 	// GenomicInterval requested_interval(0, 100000000, 105000000);
-
 	stitchAlignmentsSerial(input_streams, requested_interval, file_name, fname_out, ref_file_name);
 }
 

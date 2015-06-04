@@ -6,16 +6,13 @@
 
 #include "RefereeCompress.hpp"
 #include "RefereeDecompress.hpp"
-// #include "decompress/Decompressor.hpp"
 
 using namespace std;
 
 struct Params {
-    // string mode = "-c"; // or "-d"
     bool decompress = false; // true for decompress, false for compress
     string input_file;  // path to the input file
     int threads = -1;    // max number of threads to use
-    // string compression_mode;// = "--seq"; // --seq or --seqUniq
     bool seq_only = false;
     bool discard_secondary_alignments = false;
     string ref_file;    // path to the reference sequence in *.fa format
@@ -23,16 +20,31 @@ struct Params {
 };
 
 
+void printUsage() {
+    cerr << "Referee -- separable compression for sequence alignments" << endl;
+    cerr << "To compress:" << endl << 
+        "\treferee [options] -r reference.fa alignments.sam" << endl;
+    cerr << "To decompress:" << endl << 
+        "\treferee -d [options] -r reference.fa alignments.sam" << endl;
+    cerr << "Options:" << endl;
+    cerr << "\t-t=N                 number of threads" << endl;
+    cerr << "\t--seqOnly            encode sequencing data only" << endl;
+    cerr << "\t--discardSecondary   discard secondary alignments" << endl;
+    cerr << "\tview chrK:L-M        retrieve data from interval [L,M) on chromosome K" << endl;
+    cerr << "\t-h, --help           this help" << endl;
+}
+
+
 ////////////////////////////////////////////////////////////////
 Params parseParameters(int argc, char * argv[]) {
-    if (argc < 3) {
-        cerr << "[ERROR] Not enough arguments" << endl;
-        exit(1);
-    }
     Params p;
     for (int i = 1; i < argc; i++) {
         if ( strcmp(argv[i], "-d") == 0) {
             p.decompress = true;
+        }
+        else if ( strcmp(argv[i], "-h") == 0 || strcmp(argv[i], "--help") == 0) {
+            printUsage();
+            exit(0);
         }
         else if (strcmp(argv[i], "-t") == 0) {
             i++;
@@ -63,8 +75,13 @@ Params parseParameters(int argc, char * argv[]) {
             p.input_file = argv[i];
         }
     }
+    if (argc < 3) {
+        cerr << "[ERROR] Not enough arguments" << endl;
+        printUsage();
+        exit(1);
+    }
     if (p.input_file.size() == 0) {
-        cerr << "[ERROR] Missing required argument: -i <input_file>" << endl;
+        cerr << "[ERROR] Missing required argument: <input_file>" << endl;
         exit(1);
     }
     return p;

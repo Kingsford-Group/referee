@@ -13,8 +13,6 @@ uint8_t samToTwoBit[] = {0, /*A*/0, /*C*/1, 0, /*G*/2, 0, 0, 0, /*T*/3,
 #include <algorithm>
 #include <vector>
 
-#include "FastaReader.h"
-
 using namespace std;
 
 typedef int read_id_t;
@@ -28,61 +26,20 @@ char CODE_ORDER[L+1] = "ACDEHGLNRTVWXYZ";
 #define edit_dist_t vector<unsigned short>
 
 ////////////////////////////////////////////////////////////////
-//
-// count number of reads with edits and edits total
-//
+void check_file_open(ifstream & ref_in, string const & fname) {
+  if (!ref_in) {
+    cerr << "[ERROR] Could not open file " << fname << endl;
+    exit(1);
+  }
+}
+
 ////////////////////////////////////////////////////////////////
-struct Stats {
-  // total stats in terms of inidividual occurrences
-  int deletions = 0;
-  int insertions = 0;
-  int splices = 0;
-  int clips = 0;
-  int hard_clips = 0;
-  int mismatches = 0;
-  // stats in terms of reads
-  int r_deletions = 0;
-  int r_insertions = 0;
-  int r_mm = 0;
-  int r_splices = 0;
-  int r_clips = 0;
-  int r_hclips = 0;
-  int r_rejected = 0;
-  int r_unaligned = 0;
-};
-
-
-
-void printStats(Stats & stats, int const concordant_edits, int const total_edits, int const cutoff) {
-    // cerr << endl;
-    cerr << "Reads with: dels = " << stats.r_deletions
-         << "\tins = " << stats.r_insertions 
-         << "\tsplices  = " << stats.r_splices
-         << "\tclips = " << stats.r_clips
-         << "\tmm = " << stats.r_mm
-         << "\trejected = " << stats.r_rejected << ",\tof them unaligned = "
-         << stats.r_unaligned << endl;
-         
-
-    // cerr << "Total:\tdels = " << stats.deletions
-    //      << "\tins = " << stats.insertions 
-    //      << "\tsplices  = " << stats.splices
-    //      << "\tclips = " << stats.clips
-    //      << "\tmismatches = " << stats.mismatches << endl;
-
-    // cerr << endl << "Positions having " << cutoff << "+ edits, 50% or more consistent: " << concordant_edits 
-    //     << " (out of " << total_edits << " total bases with edits)" << endl;
+void check_file_open(ofstream & f, string const & fname) {
+  if (!f) {
+    cerr << "[ERROR] Could not open file " << fname << endl;
+    exit(1);
+  }
 }
-
-
-inline int getFileLength(ifstream & stream) {
-  // get file length
-  stream.seekg(0, stream.end);  // move to the end
-  int length = stream.tellg();   // get the size in bytes?
-  stream.seekg(0, stream.beg);  // move back to the beginning
-  return length;
-}
-
 
 ////////////////////////////////////////////////////////////////
 //
@@ -96,7 +53,19 @@ size_t getFileSize(ifstream & fff) {
     return length;
 }
 
-
+////////////////////////////////////////////////////////////////
+char reverseReplace(uint8_t & c) {
+        if (c == 'V') return 'N';
+        if (c == 'W') return 'A';
+        if (c == 'X') return 'C';
+        if (c == 'Y') return 'G';
+        if (c == 'Z') return 'T';
+        if (c == 'K') return 'A';
+        if (c == 'L') return 'C';
+        if (c == 'M') return 'G';
+        if (c == 'N') return 'T';
+        return '-';
+}
 
 ////////////////////////////////////////////////////////////////
 //
@@ -124,6 +93,7 @@ inline void reverse_complement(string & s) {
         }
 }
 
+////////////////////////////////////////////////////////////////
 inline vector<uint8_t> reverse_complement(vector<uint8_t> & v) {
 	vector<uint8_t> copy(v);
 	reverse(copy.begin(), copy.end() );
@@ -135,6 +105,7 @@ inline vector<uint8_t> reverse_complement(vector<uint8_t> & v) {
 	return copy;
 }
 
+////////////////////////////////////////////////////////////////
 inline string getMinimizer(vector<uint8_t> & v, int len) {
 	vector<string> kmers;
 	for (int i = 0; i < v.size() - len + 1; i++)

@@ -5,14 +5,11 @@
 #include <sstream>
 #include <list>
 
+#include "RefereeUtils.hpp"
+#include "FastaReader.h"
+
 const string separator = "\t\s ";
 
-void check_file_open(ifstream & ref_in, string const & fname) {
-	if (!ref_in) {
-		cerr << "[ERROR] Could not open file " << fname << endl;
-		exit(1);
-	}
-}
 
 class TranscriptsStream {
 
@@ -170,15 +167,7 @@ class TranscriptsStream {
 				// bytes per line
 				getline(ss, token, '\t');
 				int bytes = stoi(token);
-				// fai_index.emplace(
-				// 	std::piecewise_construct,
-				// 	// std::forward_as_tuple(ref_name), 
-				// 	// std::forward_as_tuple(ref_name, n, b, bp, bytes) );
-				// 	ref_name,
-				// 	FaiEntry{ref_name, n, b, bp, bytes} );
-				fai_index.insert(
-					make_pair(
-						ref_name,
+				fai_index.insert( make_pair( ref_name,
 						FaiEntry(ref_name, n, b, bp, bytes)
 						) );
 			}
@@ -220,33 +209,6 @@ class TranscriptsStream {
 		}
 		f_in.close();
 		return t_map;
-	}
-
-
-	////////////////////////////////////////////////////////////////
-	//
-	////////////////////////////////////////////////////////////////
-	inline unordered_map<string, shared_ptr<string>> parseTranscripts(string const & fname) {
-		// check if file exists
-		ifstream f_in(fname);
-		if (!f_in) {
-			cerr << "[ERROR] Reference file not found: " << fname << endl;
-			exit(1);
-		}
-		f_in.close();
-
-		unordered_map<string, shared_ptr<string>> transcripts;
-		char * fname_char = new char[fname.size() + 1];
-		strcpy(fname_char, fname.c_str());
-		auto fr = FastaReader(fname_char);
-		kseq_t * seq;
-		while ((seq = fr.nextSequence())) {
-			cerr << "[INFO] Reading reference sequence " << seq->name.s << "..." << endl;
-			transcripts.emplace(seq->name.s, make_shared<string>(seq->seq.s) );
-		}
-		delete fname_char;
-
-		return transcripts;
 	}
 
 	////////////////////////////////////////////////////////////////
@@ -300,8 +262,6 @@ public:
 			// TODO: also: read dictionaries for the flags
 		}
 		fai_index = readFAI(ref);
-		// reads all sequences into memory at once
-		// ref_sequence = parseTranscripts(ref_path);
 	}
 
 	////////////////////////////////////////////////////////////////

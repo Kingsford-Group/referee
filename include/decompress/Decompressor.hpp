@@ -31,8 +31,9 @@
 #define D_OPTIONAL_FIELDS	16
 
 
-
 ////////////////////////////////////////////////////////////////
+//
+//
 //
 ////////////////////////////////////////////////////////////////
 struct InputStreams {
@@ -48,24 +49,14 @@ struct InputStreams {
 	InputStreams() {}
 };
 
-
-
-
-char reverseReplace(uint8_t & c) {
-        if (c == 'V') return 'N';
-        if (c == 'W') return 'A';
-        if (c == 'X') return 'C';
-        if (c == 'Y') return 'G';
-        if (c == 'Z') return 'T';
-        if (c == 'K') return 'A';
-        if (c == 'L') return 'C';
-        if (c == 'M') return 'G';
-        if (c == 'N') return 'T';
-        return '-';
-}
-
+////////////////////////////////////////////////////////////////////////////////
+//
+//
+//
+////////////////////////////////////////////////////////////////////////////////
 class Decompressor {
 
+	////////////////////////////////////////////////////////////////////////////
 	// sync the streams
 	void sync_streams(InputStreams & is, pair<int, unsigned long> & off_block_start, 
 		pair<int, unsigned long> & edit_block_start, int target_coord) {
@@ -112,11 +103,9 @@ class Decompressor {
 		cerr << "after seeking current coord is: " << offset << endl;
 	}
 
-////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 //
-//
-//
-////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
 public:
 
 	Decompressor(
@@ -127,28 +116,16 @@ public:
 		output_name(output_fname),
 		ref_path(ref_path) { }
 
-	////////////////////////////////////////////////////////////////
+	////////////////////////////////////////////////////////////////////////////
 	// Reconstruct SAM file by combining the inputs; restoring reads and quals
-	////////////////////////////////////////////////////////////////
-	// void decompress(InputStreams & is, bool & done) {
-	void decompress(InputStreams & is, bool & done, uint8_t options) {
+	////////////////////////////////////////////////////////////////////////////
+	void decompress(InputStreams & is, bool & done, uint8_t const options) {
 		// sequence-specific streams
-		// OffsetsStream offs(file_name);
-		// EditsStream edits(file_name);
-		// ClipStream left_clips(file_name, ".left_clip" );
-		// ClipStream right_clips(file_name, ".right_clip" );
-
 		read_len = is.edits->getReadLen();
 		cerr << "Read length:\t" << (int)read_len << endl;
 		TranscriptsStream transcripts(file_name, ref_path, "-d");
 		recovered_file.open( output_name.c_str() );
-		// TODO: check if opened successfully
-
-		// other streams
-		// ReadIDStream readIDs(file_name);
-		// FlagsStream flags(file_name/*, transcripts*/);
-		// QualityStream qualities(file_name, /* K_c */ 4); // TODO: a parameter
-
+		check_file_open(recovered_file, file_name);
 
 		int ref_id = is.offs->getNextTranscript();
 		int i = 0;
@@ -167,21 +144,20 @@ public:
 			}
 			else if (offset == END_OF_STREAM) {
 				// break
-				// cerr << "done";
+				cerr << "done";
 			}
 			else {
 				// legit offset
 				int ret = is.edits->next(); // advance to the next alignment
 				if (ret == END_OF_STREAM) {
-					cerr << "done with edits" << endl;
-					// break;
+					cerr << "no more edits" << endl;
 				}
-				// cerr << "has edit: " << edits.hasEdits() << endl;
 				if (is.edits->hasEdits() ) {
 					// extract edits
 					vector<uint8_t> edit_ops = is.edits->getEdits();
 					reconstructAlignment(offset, read_len, ref_id, transcripts, 
-						edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities, options); // TODO: add right and left clips
+						edit_ops, is.left_clips, is.right_clips, is.readIDs, 
+						is.flags, is.qualities, options); 
 				}
 				else {
 					reconstructAlignment(offset, read_len, ref_id, transcripts, is.readIDs, 
@@ -189,7 +165,6 @@ public:
 				}
 			}
 			i++;
-			// if (i > 20) exit(1);
 			if (i % 1000000 == 0) {
 				cerr << i / 1000000 << "mln ";
 			}
@@ -200,11 +175,10 @@ public:
 
 
 	////////////////////////////////////////////////////////////////
-	//
 	// Decompress alignments within a given interval
-	//
 	////////////////////////////////////////////////////////////////
-	void decompressInterval(GenomicInterval interval, int read_len, InputStreams & is, uint8_t options) {
+	void decompressInterval(GenomicInterval interval, int read_len, InputStreams & is, 
+		const uint8_t options) {
 		TranscriptsStream transcripts(file_name, ref_path, "-d");
 		recovered_file.open( output_name.c_str() );
 		if (!recovered_file) {
@@ -268,7 +242,6 @@ public:
 				}
 			}
 			i++;
-			// if (i > 20) exit(1);
 			if (i % 1000000 == 0) {
 				cerr << i / 1000000 << "mln ";
 			}
