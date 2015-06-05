@@ -58,7 +58,7 @@ class Decompressor {
 
 	////////////////////////////////////////////////////////////////////////////
 	// sync the streams
-	void sync_streams(InputStreams & is, pair<int, unsigned long> & off_block_start, 
+	void sync_streams(InputStreams & is, pair<int, unsigned long> & off_block_start,
 		pair<int, unsigned long> & edit_block_start, int target_coord) {
 		int offset_coord = off_block_start.first;
 		unsigned long offset_num_al = off_block_start.second;
@@ -121,16 +121,22 @@ public:
 	////////////////////////////////////////////////////////////////////////////
 	void decompress(int read_len, InputStreams & is, uint8_t const options) {
 		// sequence-specific streams
-		read_len = is.edits->getReadLen();
+		// read_len = is.edits->getReadLen();
 		cerr << "Read length:\t" << (int)read_len << endl;
 		TranscriptsStream transcripts(file_name, ref_path, "-d");
 		recovered_file.open( output_name.c_str() );
 		check_file_open(recovered_file, file_name);
 
-		int ref_id = is.offs->getNextTranscript();
+		// prime the first blocks in every stream
+		pair<int,unsigned long> off_start_coord = is.offs->seekToBlockStart(-1, 0, 0);
+		pair<int,unsigned long> edit_start_coord = is.edits->seekToBlockStart(-1, 0, 0);
+
+		// int ref_id = is.offs->getNextTranscript();
+		int ref_id = is.offs->getCurrentTranscript();
 		int i = 0;
 		while ( is.offs->hasMoreOffsets() ) {
 			int offset = is.offs->getNextOffset();
+			// cerr << "Offset: " << offset << endl;
 			if (offset == END_OF_TRANS) {
 				// remove the prev transcript sequence -- will not need it anymore
 				transcripts.dropTranscriptSequence(ref_id);
@@ -155,12 +161,12 @@ public:
 				if (is.edits->hasEdits() ) {
 					// extract edits
 					vector<uint8_t> edit_ops = is.edits->getEdits();
-					reconstructAlignment(offset, read_len, ref_id, transcripts, 
-						edit_ops, is.left_clips, is.right_clips, is.readIDs, 
-						is.flags, is.qualities, options); 
+					reconstructAlignment(offset, read_len, ref_id, transcripts,
+						edit_ops, is.left_clips, is.right_clips, is.readIDs,
+						is.flags, is.qualities, options);
 				}
 				else {
-					reconstructAlignment(offset, read_len, ref_id, transcripts, is.readIDs, 
+					reconstructAlignment(offset, read_len, ref_id, transcripts, is.readIDs,
 						is.flags, is.qualities, options);
 				}
 			}
@@ -177,7 +183,7 @@ public:
 	////////////////////////////////////////////////////////////////
 	// Decompress alignments within a given interval
 	////////////////////////////////////////////////////////////////
-	void decompressInterval(GenomicInterval interval, int read_len, InputStreams & is, 
+	void decompressInterval(GenomicInterval interval, int read_len, InputStreams & is,
 		const uint8_t options) {
 		TranscriptsStream transcripts(file_name, ref_path, "-d");
 		recovered_file.open( output_name.c_str() );
@@ -194,11 +200,11 @@ public:
 		// loads the first block overlapping he requested coordinate
 		// cerr << "Seeking to the first edit block" << endl;
 		pair<int,unsigned long> edit_start_coord = is.edits->seekToBlockStart(interval.chromosome, interval.start, interval.stop);
-		
-		cerr << "syncing input streams" << endl;
+
+		// cerr << "syncing input streams" << endl;
 		sync_streams(is, off_start_coord, edit_start_coord, interval.start);
-		cerr << "STREAMS SYNCED" << endl;
-		
+		// cerr << "STREAMS SYNCED" << endl;
+
 		// now restore alignments
 		int i = 0, offset = 0;
 		while ( is.offs->hasMoreOffsets() ) {
@@ -216,7 +222,7 @@ public:
 					cerr << "Done" << endl;
 					return;
 				}
-				cerr << "chr=" << transcripts.getMapping(ref_id) << " ";
+				// cerr << "chr=" << transcripts.getMapping(ref_id) << " ";
 			}
 			else if (offset == END_OF_STREAM) {
 				// break
@@ -233,12 +239,12 @@ public:
 				if (is.edits->hasEdits() ) {
 					// extract edits
 					vector<uint8_t> edit_ops = is.edits->getEdits();
-					reconstructAlignment(offset, transcripts.getReadLength(), ref_id, transcripts, 
+					reconstructAlignment(offset, transcripts.getReadLength(), ref_id, transcripts,
 						edit_ops, is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities, options); // TODO: add right and left clips
 				}
-				else 
+				else
 				{
-					reconstructAlignment(offset, transcripts.getReadLength(), ref_id, transcripts, is.readIDs, 
+					reconstructAlignment(offset, transcripts.getReadLength(), ref_id, transcripts, is.readIDs,
 						is.flags, is.qualities, options);
 				}
 			}
@@ -276,7 +282,7 @@ private:
 			shared_ptr<ReadIDStream> read_ids,
 			shared_ptr<FlagsStream> flags,
 			shared_ptr<QualityStream> qualities, uint8_t const options) {
-
+		// cerr << "XXX ";
 		if (options & D_READIDS) {
 			string read_id;
 			if ( read_ids->getNextID(read_id) != SUCCESS) {
@@ -288,8 +294,8 @@ private:
 		if (options & D_FLAGS) {
 			auto alignment_flags = flags->getNextFlagSet();
 			assert(alignment_flags.size() == 5);
-			int flag = alignment_flags[0], mapq = alignment_flags[1], 
-				rnext = alignment_flags[2], pnext = alignment_flags[3], 
+			int flag = alignment_flags[0], mapq = alignment_flags[1],
+				rnext = alignment_flags[2], pnext = alignment_flags[3],
 				tlen = alignment_flags[4];
 
 			recovered_file << flag << "\t";
@@ -301,7 +307,7 @@ private:
 			recovered_file << "\t" << rnext << "\t" << pnext << "\t" << tlen << "\t";
 		}
 
-		
+
 		// get read sequence
 		string read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
 		// to upper case
@@ -309,7 +315,7 @@ private:
 
 		if (options & D_SEQ) {
 			recovered_file << read;
-			if ( (options & D_QUALS) || (options & D_OPTIONAL_FIELDS) ) 
+			if ( (options & D_QUALS) || (options & D_OPTIONAL_FIELDS) )
 				// more data to come -- separate
 				recovered_file << "\t";
 		}
@@ -319,7 +325,7 @@ private:
 		}
 		if (options & D_OPTIONAL_FIELDS) {
 			// skip MD -- read has no edits
-			// TODO: write out other optional fields	
+			// TODO: write out other optional fields
 		}
 		recovered_file << endl;
 	}
@@ -337,7 +343,7 @@ private:
 			shared_ptr<QualityStream> qualities,
 			uint8_t const options) {
 		// get read ID for this alignment
-
+		// cerr << "YYY ";
 		if (options & D_READIDS) {
 			string read_id;
 			if ( read_ids->getNextID(read_id) != SUCCESS) {
@@ -350,24 +356,24 @@ private:
 		if (options & D_FLAGS) {
 			auto alignment_flags = flags->getNextFlagSet();
 			assert(alignment_flags.size() == 5);
-			flag = alignment_flags[0], mapq = alignment_flags[1], 
-				rnext = alignment_flags[2], pnext = alignment_flags[3], 
+			flag = alignment_flags[0], mapq = alignment_flags[1],
+				rnext = alignment_flags[2], pnext = alignment_flags[3],
 				tlen = alignment_flags[4];
 			// write out read ID, flag value
-			recovered_file << flag << "\t";		
+			recovered_file << flag << "\t";
 			// write out reference name, offset (1-based in SAMs)
 			recovered_file << transcripts.getMapping(ref_id) << "\t" << (offset+1) ;
 		}
 
 		string cigar, md_string = "MD:Z:";
-		string read = buildEditStrings(read_len, edits, cigar, md_string, 
+		string read = buildEditStrings(read_len, edits, cigar, md_string,
 			left_clips, right_clips, offset, ref_id, transcripts);
 		// TODO: need to convert? diff can ignore case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
 
 		if (options & D_FLAGS) {
 			// write out mapq value, cigar
-			recovered_file << "\t" << mapq << "\t" << cigar << "\t" << 
+			recovered_file << "\t" << mapq << "\t" << cigar << "\t" <<
 				rnext << "\t" << pnext << "\t" << tlen << "\t";
 		}
 
@@ -389,11 +395,11 @@ private:
 	////////////////////////////////////////////////////////////////
 	// build CIGAR, MD strings for the read with edits
 	////////////////////////////////////////////////////////////////
-	string buildEditStrings(int read_len, vector<uint8_t> & edits, 
-		string & cigar, string & md_string, 
+	string buildEditStrings(int read_len, vector<uint8_t> & edits,
+		string & cigar, string & md_string,
 		shared_ptr<ClipStream> left_clips,
 		shared_ptr<ClipStream> right_clips,
-		int offset, int ref_id, 
+		int offset, int ref_id,
 		TranscriptsStream & transcripts) {
 
 		// cerr << "get reference seq ";
@@ -405,11 +411,14 @@ private:
 		int splice_offset = 0;
 		int last_abs_pos = 0, Ds = 0, Is = 0; // number of deletions
 		bool first_md_edit = true;
-		// cerr << endl << "off " << offset+1 << " len=" << edits.size() << " ";
+		// if (offset == 57508325)
+			// cerr << endl << "off " << offset+1 << " len=" << edits.size() << " ";
+
 		uint8_t op;
 		while (j < edits.size() ) {
 			op = edits[j];
-			// cerr << op << " ";
+			if (offset == 57508325)
+				cerr << op << " ";
 			switch (op) {
 				case 'L': {
 					string left_clip;
@@ -545,6 +554,11 @@ private:
 					offset_since_last_cigar = 0;
 					// update the read
 					// TODO: test with hard clipped strings
+					if (offset == 57509325) cerr << offset << endl;
+					if (read.size() <= last_cigar_edit_pos) {
+						cerr << "weird stuff: " << read.size() << " cigar: " << last_cigar_edit_pos << " offs: " << offset << endl;
+					}
+					assert(read.size() > last_cigar_edit_pos);
 					read.replace(last_cigar_edit_pos, read_len - last_cigar_edit_pos,
 						transcripts.getTranscriptSequence(ref_id, offset + splice_offset, read_len - last_cigar_edit_pos));
 					// cerr << "read: " << read << endl;
@@ -617,7 +631,7 @@ private:
 					// add the letter we see in the reference to the MD string
 					// cerr << "last abs pos: " << last_abs_pos << " ";
 					md_string += read[last_abs_pos];
-					// add correct read to have its original base 
+					// add correct read to have its original base
 					read[last_abs_pos] = op;
 					offset_since_last_cigar += edits[j];
 					offset_since_last_md = 0;
@@ -632,6 +646,7 @@ private:
 				cigar += "M";
 				cigar += right_cigar;
 				// update read w/ the right clip
+				assert(read_len - right_clip.length() < read.size() );
 				read.replace(read_len - right_clip.length(), right_clip.length(), right_clip);
 			}
 			else {
@@ -643,6 +658,8 @@ private:
 			md_string += to_string(clipped_read_len - last_md_edit_pos);
 		}
 		// cerr << cigar << "\t" << md_string << endl;
+
+		// cerr << "Done w/ edits";
 		return read;
 	}
 

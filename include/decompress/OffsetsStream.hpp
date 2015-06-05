@@ -27,23 +27,21 @@ public:
 		pair<int,unsigned long> p = offsets_in->loadOverlappingBlock(ref_id, start_coord, end_coord, is_transcript_start);
 		auto block_start_coord = p.first;
 		unsigned long block_num_align = p.second;
-		// cerr << "2: " << block_num_align << endl;
 		if (block_start_coord < 0) {
 			cerr << "[ERROR] Could not navigate to the begining of the interval" << endl;
 			exit(1);
 		}
 		current_multiplier = 0;
 		current_offset = block_start_coord;
-		// cerr << "PIZZA " << current_offset << endl;
 		delta = 0;	// is delta set correctly?
 		if (is_transcript_start) {
 			// consumes bytes describing the transcript ID
 			int ref_id = getNextTranscript();
-			cerr << "current transcript: " << ref_id << endl;
+			// cerr << "current transcript: " << ref_id << endl;
 		}
 		// if actual_start_coord >= start_coord -- we did not have any alignment before this
 		// and should start with actual_start_coord
-		// if actual_start_coord < start_coord -- should handle this case in Decompressor and 
+		// if actual_start_coord < start_coord -- should handle this case in Decompressor and
 		// seek to the desired coordinate along w/ other data streams (clips, quals, edits, etc)
 		p.first = getCurrentOffset();
 		return p;
@@ -110,7 +108,7 @@ public:
 				return END_OF_STREAM;
 			}
 			if (c == '\n') { // that's it for this transcript, moving on to the next
-				cerr << "end of line" << endl;
+				// cerr << "end of line" << endl;
 				current_transcript = -1;
 				return END_OF_TRANS;
 			}

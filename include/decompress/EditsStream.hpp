@@ -25,9 +25,9 @@ private:
 	size_t alignments_expected = 0;
 
 	////////////////////////////////////////////////////////////////////////////
-	// 
+	//
 	////////////////////////////////////////////////////////////////////////////
-	pair<int,unsigned long> syncEditStreams(pair<int, unsigned long> & edits_start, 
+	pair<int,unsigned long> syncEditStreams(pair<int, unsigned long> & edits_start,
 		pair<int, unsigned long> & has_edits_start) {
 		int edit_start_coord = edits_start.first;
 		unsigned long edit_num_al = edits_start.second;
@@ -38,7 +38,7 @@ private:
 		// less than or equal to the earliest edits genomic coordinate
 		// while (edit_num_al < has_edit_num_al) {
 		// }
-		cerr << edit_num_al << " vs " << has_edits_num_al << endl;
+		// cerr << edit_num_al << " vs " << has_edits_num_al << endl;
 		assert(edit_num_al >= has_edits_num_al);
 
 		while (has_edits_num_al < edit_num_al) {
@@ -46,8 +46,8 @@ private:
 			has_edits_in->getNextByte();
 			has_edits_num_al++;
 		}
-		cerr << "has_edits_num_al: " << has_edits_num_al << endl;
-		// can not seek to the target genomic coord since we do not know the mapping between 
+		// cerr << "has_edits_num_al: " << has_edits_num_al << endl;
+		// can not seek to the target genomic coord since we do not know the mapping between
 		// genomic coords and edits/has_edits stream
 		// only the offset stream knows this mapping
 		return make_pair(edit_start_coord, has_edits_num_al);
@@ -56,14 +56,14 @@ private:
 public:
 
 	////////////////////////////////////////////////////////////////////////////
-	EditsStream(shared_ptr<InputBuffer> e, shared_ptr<InputBuffer> h): 
-		edits_in(e), 
+	EditsStream(shared_ptr<InputBuffer> e, shared_ptr<InputBuffer> h):
+		edits_in(e),
 		has_edits_in(h) {
 		}
 
 	////////////////////////////////////////////////////////////////////////////
 	~EditsStream() {
-		cerr << "Expected: " << alignments_expected << " observed: " << alignment_count << endl;
+		cerr << "Observed: " << alignment_count << " alignments" << endl;
 		// assert(alignment_count == alignments_expected);
 	}
 
@@ -110,7 +110,7 @@ public:
 		return (has_edit_byte != 0);
 	}
 
-	// byte version 
+	// byte version
 	int next() {
 		alignment_count++;
 		if ( !has_edits_in->hasMoreBytes() ) {

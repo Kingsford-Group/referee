@@ -19,9 +19,9 @@
 ////////////////////////////////////////////////////////////////
 void stitchAlignmentsSerial(
 	InputStreams & input_streams,
-	GenomicInterval & requested_interval, 
-	string const & input_fname, 
-	string const & output_name, 
+	GenomicInterval & requested_interval,
+	string const & input_fname,
+	string const & output_name,
 	string const & ref_name) {
 	// keep stitching alignments while there is data available
 	int read_len = 100;
@@ -34,7 +34,7 @@ void stitchAlignmentsSerial(
 Parse genomic coordinates file, return a map of vectors of intervals
 grouped by type of data stream
 ////////////////////////////////////////////////////////////////*/
-unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>> 
+unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>>
 	parseGenomicIntervals(string const & fname) {
 	ifstream f_in(fname);
 	check_file_open(f_in, fname);
@@ -81,14 +81,14 @@ GenomicInterval parseInputInterval(string const & location) {
 
 ////////////////////////////////////////////////////////////////
 //
-// 
+//
 //
 ////////////////////////////////////////////////////////////////
-int decompressFileSequential(string const & file_name, string const & ref_file_name, 
+int decompressFileSequential(string const & file_name, string const & ref_file_name,
 	string const & fname_out, string const & location) {
 
 	// set up inputs
-	unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>> all_intervals = 
+	unordered_map<string,shared_ptr<vector<TrueGenomicInterval>>> all_intervals =
 		parseGenomicIntervals("genomic_intervals.txt");
 	InputStreams input_streams;
 
@@ -105,7 +105,7 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 		auto suffix = pair.first;
 		auto intervals = pair.second;
 		if (suffix.compare(".offs.lz") == 0) {
-			shared_ptr<InputBuffer> offset_ib(new InputBuffer(file_name + suffix, 
+			shared_ptr<InputBuffer> offset_ib(new InputBuffer(file_name + suffix,
 				intervals, buffer_size, buffer_id));
 			// input_buffers.push_back(offset_ib);
 			buffer_map.emplace(buffer_id++, offset_ib);
@@ -113,11 +113,11 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 			input_streams.offs = shared_ptr<OffsetsStream>(new OffsetsStream(offset_ib) );
 		}
 		else if (suffix.compare(".edits.lz") == 0) {
-			shared_ptr<InputBuffer> edits_ib(new InputBuffer(file_name + suffix, 
+			shared_ptr<InputBuffer> edits_ib(new InputBuffer(file_name + suffix,
 				intervals, buffer_size, buffer_id));
 			buffer_map.emplace(buffer_id++, edits_ib);
 
-			shared_ptr<InputBuffer> has_edits_ib(new InputBuffer(file_name + ".has_edits.lz", 
+			shared_ptr<InputBuffer> has_edits_ib(new InputBuffer(file_name + ".has_edits.lz",
 				all_intervals[".has_edits.lz"], buffer_size, buffer_id));
 			buffer_map.emplace(buffer_id++, has_edits_ib);
 

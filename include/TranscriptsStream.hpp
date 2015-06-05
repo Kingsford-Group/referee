@@ -62,11 +62,11 @@ class TranscriptsStream {
 		int bp_per_line = 0;
 		int bytes_per_line = 0;
 		ofstream fai_out(fname + ".fai");
-		
+
 		int block_size = pow(2,20);
 		vector<uint8_t> buf( block_size );
 		size_t bytes_read = 0;
-		
+
 		int64_t num_bases = 0, byte_offset = 0;
 		string ref_name = "";
 		// read all bytes in the file
@@ -80,10 +80,10 @@ class TranscriptsStream {
 				if (buf[i] == '>') {
 					if (i > 1) {
 						// this is not the first first >
-						map.insert( make_pair(ref_name, 
+						map.insert( make_pair(ref_name,
 							FaiEntry(ref_name, num_bases, byte_offset, bp_per_line, bytes_per_line) ) );
 						// write out details of the previous trancsript
-						fai_out << ref_name << "\t" << num_bases << "\t" << byte_offset << "\t" << 
+						fai_out << ref_name << "\t" << num_bases << "\t" << byte_offset << "\t" <<
 							bp_per_line << "\t" << bytes_per_line << endl;
 					}
 					// find end of line, get ref_name
@@ -125,10 +125,10 @@ class TranscriptsStream {
 		int lines = (int) ceil ( (double) num_bases / bp_per_line );
 		int newline_chars = bytes_per_line - bp_per_line;
 		byte_offset = flen - (num_bases + newline_chars * lines);
-		map.insert( make_pair(ref_name, 
-				FaiEntry(ref_name, num_bases, byte_offset, bp_per_line, bytes_per_line) 
+		map.insert( make_pair(ref_name,
+				FaiEntry(ref_name, num_bases, byte_offset, bp_per_line, bytes_per_line)
 			) );
-		fai_out << ref_name << "\t" << num_bases << "\t" << byte_offset << "\t" << 
+		fai_out << ref_name << "\t" << num_bases << "\t" << byte_offset << "\t" <<
 			bp_per_line << "\t" << bytes_per_line << endl;
 
 		fai_out.close();
@@ -136,7 +136,7 @@ class TranscriptsStream {
 
 	////////////////////////////////////////////////////////////////
 	// read index for the reference and stores offsets
-	////////////////////////////////////////////////////////////////	
+	////////////////////////////////////////////////////////////////
 	unordered_map<string,FaiEntry> readFAI(string const & fname) {
 		unordered_map<string,FaiEntry> fai_index;
 		ifstream fai_in(fname + ".fai");
@@ -151,7 +151,7 @@ class TranscriptsStream {
 			cerr << "[INFO] Reading reference sequence index..." << endl;
 			// this is usually a small file -- let's use stringstream for simplicity
 			string line;
-			
+
 			while (getline(fai_in, line)) {
 				istringstream ss(line);
 				// have 5 tokens
@@ -188,7 +188,7 @@ class TranscriptsStream {
 		reverse_map.clear();
 		ifstream f_in(fname);
 		check_file_open(f_in, fname);
-		cerr << "[INFO] Reading reference sequence name mapping." << endl; 
+		cerr << "[INFO] Reading reference sequence name mapping." << endl;
 
 		int t_index = 0;
 		string line, t_name, type, chromo;
@@ -258,7 +258,7 @@ public:
 		}
 		else {
 			// if decompressing: read a t_map
-			t_map = parseTranscriptIDsPlain(file_name + ".head");	
+			t_map = parseTranscriptIDsPlain(file_name + ".head");
 			// TODO: also: read dictionaries for the flags
 		}
 		fai_index = readFAI(ref);
@@ -300,7 +300,7 @@ public:
 		auto mapped_name = t_map[ref_id];
 		auto it = ref_sequence.find(mapped_name);
 		if (it == ref_sequence.end() ) {
-			cerr << "[INFO] Could not find sequence for " << mapped_name << ". Loading... ";
+			cerr << "[INFO] Loading sequence for " << mapped_name;
 			if ( fai_index.find(mapped_name) == fai_index.end() ) {
 				cerr << "[ERROR] Reference name " << mapped_name << " not in the index." << endl;
 				exit(1);
@@ -311,7 +311,7 @@ public:
 				cerr << "seq size: " << seq->size() << " vs  offs " << offset << " len " << len << endl;
 			}
 			assert(offset + len <= seq->size() );
-			cerr << "Loaded." << endl;
+			cerr << " - loaded." << endl;
 			// store for fast access later
 			ref_sequence[mapped_name] = seq;
 			return seq->substr(offset, len);
