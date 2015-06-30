@@ -58,7 +58,13 @@ public:
 //
 ////////////////////////////////////////////////////////////////
 vector<uint8_t> unzipData(shared_ptr<vector<uint8_t>> raw_data, int const new_data_size) {
+	// cerr << "New data size: " <<  new_data_size << endl;
 	vector<uint8_t> unzipped_data(new_data_size, 0); // allocate needed amount of bytes
+
+	// try smth else for the raw data
+	// uint8_t * raw_data_buf = new uint8_t[raw_data->size() + 1];
+	// for (int i = 0; i < raw_data->size(); i++) raw_data_buf[i] = (*raw_data)[i];
+	// raw_data_buf[raw_data->size()] = '\0';
 
 	// prepare a decoder stream
 	LZ_Decoder * const decoder = LZ_decompress_open();
@@ -69,13 +75,22 @@ vector<uint8_t> unzipData(shared_ptr<vector<uint8_t>> raw_data, int const new_da
 	}
 	int wrote = 0, bytes_read = 0, need_to_write = raw_data->size();
 	int chunk_size = LZ_decompress_write_size( decoder );
+	// cerr << "chunk size: " << chunk_size << endl;
 	assert(chunk_size > 0);
 	chunk_size = std::min( chunk_size, need_to_write);
 
 	bool trailing_garbage_found = false;
 	while (wrote < need_to_write && !trailing_garbage_found && (chunk_size > 0) ) {
-		int written = LZ_decompress_write( decoder, (uint8_t *) &(*raw_data)[wrote], chunk_size );
-		if (written != chunk_size) {
+		// cerr << wrote << " vs " << raw_data->size() << endl;
+
+		int actual_chunk_size = min( (int)raw_data->size() - wrote, chunk_size);
+		// cerr << "right before decompress" << endl;
+		int written = LZ_decompress_write( decoder, (uint8_t *) &(*raw_data)[wrote], actual_chunk_size );
+		// cerr << "right after decompress" << endl;
+
+		// cerr << "Written: " << written << endl;
+
+		if (written != actual_chunk_size) {
 			cerr << "[ERROR] Lzlib error: attempted to write (" << written << ")" << endl;
 			exit(1);
 		}
@@ -84,17 +99,26 @@ vector<uint8_t> unzipData(shared_ptr<vector<uint8_t>> raw_data, int const new_da
 			exit(1);
 		}
 		wrote += written;
+		// cerr << "lz_decompress_read" << endl;
 		int read = LZ_decompress_read( decoder, (uint8_t *) &unzipped_data[bytes_read], new_data_size - bytes_read );
 		bytes_read += read;
+		// cerr << "bytes_read: " << bytes_read << " lz_decompress_write_size" << endl;
 		chunk_size = LZ_decompress_write_size( decoder );
 	}
+	// cerr << "Looped" << endl;
 	assert( wrote >= need_to_write );
 	assert(bytes_read == new_data_size);
 
 	LZ_decompress_finish( decoder );
+	// cerr << "LZ_decompress_finish-ed" << endl;
 	auto retval = LZ_decompress_finished( decoder );
+	// cerr << "LZ_decompress_finished-ed" << endl;
 	// destroys all internal data
 	LZ_decompress_close( decoder );
+	// cerr << "LZ_decompress_close-d" << endl;
+
+	// delete raw_data_buf;
+
 	return unzipped_data;
 }
 
@@ -198,9 +222,14 @@ class InputBuffer {
 			exit(1);
 		}
 		shared_ptr<vector<uint8_t>> raw_bytes(new vector<uint8_t>(block.block_size) );
+		cerr << "reading bytes from input stream" << endl;
 		f_in.read( (char *) &(*raw_bytes)[0], block.block_size);
+		cerr << "read " << f_in.gcount() << " bytes\nunzipping binary data" << endl;
 		auto unzipped_data = unzipData(raw_bytes, block.decompressed_size);
-		cerr << name << ": decompressed " << block.decompressed_size << " bytes" << endl;
+		cerr << name << ": decompressed " << block.block_size << " to " << block.decompressed_size << " bytes" << endl;
+		cerr << "first 10 bytes are: ";
+		for (int i = 0; i < 10; i++) cerr << (int) unzipped_data[i] << " ";
+		cerr << endl;
 		return unzipped_data;
 	}
 
@@ -312,16 +341,26 @@ public:
 	////////////////////////////////////////////////////////////////
 	pair<int,unsigned long> loadOverlappingBlock(int const chromo, int const start_coord, int const end_coord,
 		bool & is_transcript_start) {
-		// cerr << "Loading an overlapping block for: " << name << endl;
+		cerr << "Loading an overlapping block for: " << name << endl;
 		bytes.clear();
 		block_queue.clear();
 
 		if (chromo == -1) {
-			// add all blocks from all tree (in order) to the block queue
+			// add all blocks from all trees (in order) to the block queue
 			for (auto tree_p : chromosome_trees) {
 				auto tree = tree_p.second;
-				for (auto b : tree.intervals ) block_queue.push_back(b);
+				for (auto b : tree.intervals ) {
+					// need to check if this block was part of the previous tree
+					// and only add the block if it is different
+					if (block_queue.size() == 0) {
+						block_queue.push_back(b);
+					}
+					else if (block_queue.back().byte_offset != b.byte_offset)
+						block_queue.push_back(b);
+				}
 			}
+			cerr << "Added block to queue" << endl;
+
 			// decompress the first one
 			RawDataInterval block = block_queue.front();
 			is_transcript_start = block.isAlignedWithTranscriptStart();
@@ -403,6 +442,9 @@ public:
 	////////////////////////////////////////////////////////////////////////////
 	vector<uint8_t> getNextNBytes(int n) {
 		if (bytes.size() < n) {
+			// technically, should always have the next needed N bytes
+			// blocks should align with the boundaries of the edit sequences
+			cerr << "[ATTN] Should not need to load more data in the middle of the edit sequence" << endl;
 			readMoreLZIPBlocks();
 		}
 		vector<uint8_t> local_bytes;
@@ -415,14 +457,14 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////////////////
-	void popNBytes(int n) {
-		if (bytes.size() < n) readMoreLZIPBlocks();
+	// void popNBytes(int n) {
+	// 	if (bytes.size() < n) readMoreLZIPBlocks();
 
-		while (n > 0 && bytes.size() > 0) {
-			bytes.pop_front();
-			n--;
-		}
-	}
+	// 	while (n > 0 && bytes.size() > 0) {
+	// 		bytes.pop_front();
+	// 		n--;
+	// 	}
+	// }
 };
 
 #endif

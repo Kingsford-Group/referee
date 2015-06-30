@@ -12,6 +12,11 @@ INCLUDE=-I include/ -I /usr/local/include/ -I plzip/ -I ~/include/ -I $(HOME)/lz
 LIBS=-lstaden-read -lpthread -lplzip
 EXE=referee
 
+# plzip so functionality
+PLZIPDIR=plzip
+PLZINCLUDE="-I /usr/local/include/ -I $PLZIPDIR -I$HOME/local/include/"
+PLZLIBS="-L /usr/local/lib/ -L /usr/lib/ -L$HOME/local/lib -llz -lpthread"
+PLZSRC="compress.cc dec_stream.cc dec_stdout.cc decompress.cc file_index.cc"
 
 #SYSTEM=macos
 SYSTEM=linux
@@ -35,12 +40,15 @@ endif
 
 all: $(EXE)
 
-#plibz: 
-#	$(CC) $(CFLAGSLIB) -o lib$@.so compress.cc dec_stream.cc dec_stdout.cc decompress.cc file_index.cc -I /usr/local/include/ -I plzip -L /usr/local/lib/ -L /usr/lib/ -llz -lpthread
-
+plzipso:
+	$(CC) -shared -fPIC -o libplzip.so $SRC $PLZINCLUDE $PLZLIBS
+	export DYLD_LIBRARY_PATH=plzip/:$DYLD_LIBRARY_PATH
 $(EXE):
 	$(CC) $(CFLAGS) $(CCPARALL) $(LDFLAGS) -o $(BIN)/$@ $(SRC) $(INCLUDE) $(TBBINCL) $(LIBS) $(TBBLIBS)
 clean:
 	rm -f $(BIN)/$(EXE)
 rsupport:
 	$(CC) $(CFLAGS) $(CCPARALL) $(LDFLAGS) -o $(BIN)/$@ $(SRCSUPP) $(INCLUDE) $(LIBS) $(TBBLIBS)
+plzipso:
+	$(CC) -shared -fPIC -o libplzip.so $SRC $PLZINCLUDE $PLZLIBS
+	export DYLD_LIBRARY_PATH=plzip/:$DYLD_LIBRARY_PATH

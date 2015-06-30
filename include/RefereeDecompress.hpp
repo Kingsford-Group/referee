@@ -101,28 +101,35 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 	//////////////////////////////////////////////////////////
 	// vector<shared_ptr<InputBuffer>> input_buffers;
 	// TODO: don't need the buffer_map anymore
+	unordered_set<string> suffixes;
 	for (auto pair : all_intervals) {
 		auto suffix = pair.first;
 		auto intervals = pair.second;
-		if (suffix.compare(".offs.lz") == 0) {
-			shared_ptr<InputBuffer> offset_ib(new InputBuffer(file_name + suffix,
-				intervals, buffer_size, buffer_id));
-			// input_buffers.push_back(offset_ib);
-			buffer_map.emplace(buffer_id++, offset_ib);
 
-			input_streams.offs = shared_ptr<OffsetsStream>(new OffsetsStream(offset_ib) );
+		cerr << suffix << endl;
+		
+		if (suffixes.find(suffix) != suffixes.end() ) 
+			// already saw this suffix and initialized buffers for it
+			continue;
+		shared_ptr<InputBuffer> buf(new InputBuffer(file_name + suffix, intervals, buffer_size, buffer_id));
+		// TODO: do we use this ID anywhere? was mean for hte parallel
+		buffer_map.emplace(buffer_id++, buf);
+		if (suffix.compare(".offs.lz") == 0) {
+			input_streams.offs = shared_ptr<OffsetsStream>(new OffsetsStream(buf) );
 		}
 		else if (suffix.compare(".edits.lz") == 0) {
-			shared_ptr<InputBuffer> edits_ib(new InputBuffer(file_name + suffix,
-				intervals, buffer_size, buffer_id));
-			buffer_map.emplace(buffer_id++, edits_ib);
-
 			shared_ptr<InputBuffer> has_edits_ib(new InputBuffer(file_name + ".has_edits.lz",
 				all_intervals[".has_edits.lz"], buffer_size, buffer_id));
 			buffer_map.emplace(buffer_id++, has_edits_ib);
-
-			input_streams.edits = shared_ptr<EditsStream>(new EditsStream(edits_ib, has_edits_ib) );
+			input_streams.edits = shared_ptr<EditsStream>(new EditsStream(buf, has_edits_ib) );
 		}
+		else if (suffix.compare(".left_clip.lz") == 0) {
+			input_streams.left_clips = shared_ptr<ClipStream>(new ClipStream(buf) );
+		}
+		else if (suffix.compare(".right_clip.lz") == 0) {
+			input_streams.right_clips = shared_ptr<ClipStream>(new ClipStream(buf) );
+		}
+		suffixes.insert(suffix);
 	}
 
 	if (location.size() > 0) {
@@ -136,7 +143,7 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 		// keep stitching alignments while there is data available
 		int read_len = 100;
 		Decompressor D(file_name, fname_out, ref_file_name);
-		D.decompress(read_len, input_streams, D_SEQ);
+		D.decompress(read_len, input_streams, D_SEQ | D_FLAGS);
 	}
 }
 

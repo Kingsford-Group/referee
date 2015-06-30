@@ -43,7 +43,8 @@ public:
 		match_len_limit(match_len) {
 		int flags = O_CREAT | O_WRONLY | o_binary;
 		out_fd = open( (fn + suff).c_str(), flags, outfd_mode );
-		// cerr << "Opened " << fn << suff << " stream for compressed data (fd=" << out_fd << ")" << endl;
+
+		cerr << suff << " fd=" << out_fd << endl;
 	}
 
 	///////////////////////////////////////////////////////////

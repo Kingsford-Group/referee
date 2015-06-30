@@ -63,8 +63,7 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////
 	~EditsStream() {
-		cerr << "Observed: " << alignment_count << " alignments" << endl;
-		// assert(alignment_count == alignments_expected);
+		// cerr << "Observed: " << alignment_count << " alignments" << endl;
 	}
 
 	////////////////////////////////////////////////////////////////////////////
@@ -87,6 +86,7 @@ public:
 		}
 		// sync these streams
 		auto synced_coord = syncEditStreams(edits_start, has_edits_start);
+		cerr << "Synced edits streams: " << synced_coord.first << ", " << synced_coord.second << endl;
 		return synced_coord;
 	}
 

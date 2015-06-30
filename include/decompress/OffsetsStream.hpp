@@ -13,13 +13,15 @@ private:
 	int current_offset = 0;
 	int delta = 0;
 	int current_transcript = -1;
+	size_t offsets_cnt = 0;
 
 public:
-	// OffsetsStream(string & file_name) {
-	// 	offsets_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".offs") );
-	// }
 
 	OffsetsStream(shared_ptr<InputBuffer> ib): offsets_in(ib) { }
+
+	~OffsetsStream() {
+		// cerr << "OffsetsStream went through " << offsets_cnt << " offsets" << endl;
+	}
 
 	////////////////////////////////////////////////////////////////////////
 	pair<int, unsigned long> seekToBlockStart(int ref_id, int const start_coord, int const end_coord) {
@@ -49,7 +51,7 @@ public:
 
 	////////////////////////////////////////////////////////////////////////
 	bool hasMoreOffsets() {
-		if (!offsets_in->hasMoreBytes() ) return false;
+		if (!offsets_in->hasMoreBytes() && current_multiplier == 0 ) return false;
 		return true;
 	}
 
@@ -97,6 +99,7 @@ public:
 			return END_OF_TRANS;
 		}
 		else if (current_multiplier > 0) {
+			offsets_cnt++;
 			current_multiplier--; // used up one of the copies of this read
 			return current_offset;
 		}
@@ -138,6 +141,7 @@ public:
 				current_multiplier = stoi( string(chunk.begin(), chunk.end() ) );
 				current_multiplier--;	// will return this offset once right now
 			}
+			offsets_cnt++;
 			return current_offset;
 		}
 	}

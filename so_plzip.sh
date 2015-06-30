@@ -17,5 +17,6 @@ g++ -shared -fPIC -o libplzip.so $SRC $INCLUDE $LIBS
 
 # make the lib available at runtime
 export LD_LIBRARY_PATH=$PLZIPDIR:$LD_LIBRARY_PATH
+export DYLD_LIBRARY_PATH=plzip/:$DYLD_LIBRARY_PATH
 
 cd $ORIG
