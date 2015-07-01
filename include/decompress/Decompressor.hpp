@@ -60,17 +60,24 @@ class Decompressor {
 
 	////////////////////////////////////////////////////////////////////////////
 	// sync the streams
-	void sync_streams(InputStreams & is, pair<int, unsigned long> & off_block_start,
-		pair<int, unsigned long> & edit_block_start, int target_coord) {
+	// TODO: take into account where clips start
+	////////////////////////////////////////////////////////////////////////////
+	void sync_streams(InputStreams & is, 
+		pair<int, unsigned long> & off_block_start,	// offsets
+		pair<int, unsigned long> & edit_block_start, // edits
+		pair<int, unsigned long> & lc_start, // left clips
+		pair<int, unsigned long> & rc_start, // right clips
+		int const target_ref_id,
+		int const target_coord) {
+
 		int offset_coord = off_block_start.first;
 		unsigned long offset_num_al = off_block_start.second;
 
 		int edit_coord = edit_block_start.first;
 		unsigned long edit_num_al = edit_block_start.second;
-		cerr << "of " << offset_num_al << " e " << edit_num_al << endl;
 
-		// first sync be the number of coordinates preceeding the blocks
-		cerr << "bringing edits up to speed" << endl;
+		// first sync by the number of alignments preceeding the blocks
+		cerr << "bringing all streams up to speed w/ offset stream" << endl;
 		while (edit_num_al < offset_num_al) {
 			is.edits->next(); // next has_edit byte
 			// skip edit list for this alignment if there is one
@@ -86,13 +93,18 @@ class Decompressor {
 		cerr << "offs_num_al: " << offset_num_al << endl;
 
 		// now seek to the target coordinate
+		cerr << "seeking to a target coordinate chr=" << target_ref_id << ":" << target_coord << endl;
 		int offset = is.offs->getCurrentOffset();
+		int ref_id = is.offs->getCurrentTranscript();
 		assert(offset_coord <= offset);
-		while (offset < target_coord) {
+		while (ref_id < target_ref_id || offset < target_coord) {
 			offset = is.offs->getNextOffset();
 			if (offset == END_OF_TRANS) {
-				cerr << "[ERROR] unexpected end of transcript offsets" << endl;
-				exit(1);
+				ref_id = is.offs->getNextTranscript();
+				if (ref_id == END_OF_STREAM) {
+					cerr << "[ERROR] Unexpected end of offsets stream" << endl;
+					exit(1);
+				}
 			}
 			else if (offset == END_OF_STREAM) {
 				cerr << "[ERROR] unexpected end of offsets stream" << endl;
@@ -102,7 +114,7 @@ class Decompressor {
 			is.edits->next();
 			if (is.edits->hasEdits() ) is.edits->getEdits();
 		}
-		cerr << "after seeking current coord is: " << offset << endl;
+		cerr << "after seeking current coord is: chr=" << ref_id << ":" << offset << endl;
 	}
 
 ////////////////////////////////////////////////////////////////////////////////
@@ -138,15 +150,16 @@ public:
 		is.edits->seekToBlockStart(-1, 0, 0);
 		is.left_clips->seekToBlockStart(-1, 0, 0);
 		is.right_clips->seekToBlockStart(-1, 0, 0);
-		if (is.flags == nullptr) cerr << "Flags stream is not set up" << endl;
+		// if (is.flags == nullptr) cerr << "Flags stream is not set up" << endl;
 		is.flags->seekToBlockStart(-1, 0, 0);
+		is.readIDs->seekToBlockStart(-1, 0, 0);
 
 		int ref_id = is.offs->getCurrentTranscript();
+		cerr << "Starting with transcript " << ref_id << endl;
 		int i = 0;
 		while ( is.offs->hasMoreOffsets() ) {
 			// zero-based offsets
 			int offset_0 = is.offs->getNextOffset();
-			// cerr << "Offset_1: " << (offset_0 + 1);
 
 			if (offset_0 == END_OF_TRANS) {
 				// remove the prev transcript sequence -- will not need it anymore
@@ -161,7 +174,7 @@ public:
 			}
 			else if (offset_0 == END_OF_STREAM) {
 				// break
-				cerr << "done";
+				cerr << "Done";
 			}
 			else {
 				// legit offset
@@ -169,7 +182,6 @@ public:
 				if (ret == END_OF_STREAM) {
 					cerr << "no more edits" << endl;
 				}
-
 				reconstructAlignment(offset_0, read_len, ref_id, transcripts,
 					is.edits,
 					is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities,
@@ -210,11 +222,13 @@ public:
 		pair<int,unsigned long> edit_start_coord = is.edits->seekToBlockStart(interval.chromosome, interval.start, interval.stop);
 
 		// cerr << "syncing input streams" << endl;
-		is.left_clips->seekToBlockStart(-1, 0, 0);
-		is.right_clips->seekToBlockStart(-1, 0, 0);
+		// TODO: enable and sync clipped regions
+		pair<int,unsigned long> lc_start, rc_start;
+		// auto lc_start = is.left_clips->seekToBlockStart(interval.chromosome, interval.start, interval.stop);
+		// auto rc_start = is.right_clips->seekToBlockStart(interval.chromosome, interval.start, interval.stop);
 
-		sync_streams(is, off_start_coord, edit_start_coord, interval.start);
-		// cerr << "STREAMS SYNCED" << endl;
+		sync_streams(is, off_start_coord, edit_start_coord, lc_start, rc_start, interval.chromosome, interval.start);
+		cerr << "STREAMS SYNCED" << endl;
 
 		// now restore alignments
 		int i = 0, offset = 0;
@@ -230,14 +244,14 @@ public:
 			if (offset == END_OF_TRANS) {
 				ref_id = is.offs->getNextTranscript();
 				if (ref_id == END_OF_STREAM) {
-					cerr << "Done" << endl;
+					// cerr << "Done" << endl;
 					return;
 				}
 				// cerr << "chr=" << transcripts.getMapping(ref_id) << " ";
 			}
 			else if (offset == END_OF_STREAM) {
 				// break
-				cerr << "done";
+				// cerr << "done";
 			}
 			else {
 				// legit offset
@@ -298,30 +312,37 @@ private:
 		string cigar, md_string, read;
 		bool has_edits = edits->hasEdits();
 		if (has_edits) {
+			// cerr << "read with edits" << endl;
 			md_string = "MD:Z:";
 			vector<uint8_t> edit_ops = edits->getEdits();
 			read = buildEditStrings(read_len, edit_ops, cigar, md_string,
 				left_clips, right_clips, offset, ref_id, transcripts);
 		}
-		else {	
+		else {
+			// cerr << "no edits read" << endl;
 			read = transcripts.getTranscriptSequence(ref_id, offset, read_len);
 		}
 		// to upper case
 		// std::transform(read.begin(), read.end(), read.begin(), ::toupper);
 
-
+		// cerr << "getting all other fields " << read_ids << endl;
 		if (options & D_READIDS) {
-			string read_id;
-			if ( read_ids->getNextID(read_id) != SUCCESS) {
-				// cerr << "[INFO] Could not extract the next read ID. Using the default." << endl;
-				read_id = "*";
+			string read_id = "*";
+			if (read_ids != nullptr) {
+				int status = 0;
+				read_id = read_ids->getNextID(status);
+				if (status != SUCCESS) read_id = "*";
 			}
+			// cerr << read_id << endl;
+			// cerr << recovered_file << endl;
 			recovered_file << read_id << "\t";
+			// cerr << "wrote to file" << endl;
 		}
 
 		int flag = -1, mapq = -1, rnext = -1, pnext = -1, tlen = -1;
 		if (options & D_FLAGS) {
 			if (flags != nullptr) {
+				// cerr << "bla " << flags << endl;
 				auto alignment_flags = flags->getNextFlagSet();
 				assert(alignment_flags.size() == 5);
 				flag = alignment_flags[0]; 
@@ -353,6 +374,7 @@ private:
 
 			recovered_file << "\t" << pnext << "\t" << tlen << "\t";
 		}
+		// cerr << "got flags 'n all" << endl;
 
 		if (options & D_SEQ) {
 			recovered_file << read;
@@ -362,11 +384,16 @@ private:
 		}
 		// TODO: write out qual vector
 		if (options & D_QUALS) {
-			recovered_file << qualities->getNextQualVector();
+			recovered_file << qualities->getNextQualVector() << "\t";
 		}
+		else {
+			recovered_file << "*\t";
+		}
+		// cerr << "wrote out quals" << endl;
+
 		if (options & D_OPTIONAL_FIELDS) {
 			if (has_edits)
-				cerr << md_string << " ";
+				recovered_file << md_string << " ";
 			// TODO: write out other optional fields
 		}
 		recovered_file << endl;

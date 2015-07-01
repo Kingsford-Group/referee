@@ -15,15 +15,15 @@
 #include "decompress/Decompressor.hpp"
 
 pair<int,int> parseFlagLine(string const & line) {
-	cerr << line << endl;
+	// cerr << line << endl;
 	auto idx = line.find(" ");
-	cerr << idx << " ";
+	// cerr << idx << " ";
 	auto idx2 = line.find(" ", idx+1);
-	cerr << idx2 << " ";
+	// cerr << idx2 << " ";
 	int original = stoi(line.substr(idx+1, idx2 - idx) );
-	cerr << original << " ";
+	// cerr << original << " ";
 	int index = stoi(line.substr(idx2+1));
-	cerr << index;
+	// cerr << index;
 	return make_pair(index, original);
 }
 
@@ -87,7 +87,7 @@ void stitchAlignmentsSerial(
 	unordered_map<int,string> & t_map) {
 	// keep stitching alignments while there is data available
 	Decompressor D(input_fname, output_name, ref_name, t_map);
-	uint8_t options = 1;
+	uint8_t options = D_SEQ | D_FLAGS | D_READIDS | D_OPTIONAL_FIELDS;
 	D.decompressInterval(requested_interval, read_len, input_streams, options);
 }
 
@@ -163,7 +163,7 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 	unordered_set<string> streams_used;
 	streams_used.insert(".offs.lz"); streams_used.insert(".edits.lz"); streams_used.insert(".has_edits.lz");
 	streams_used.insert(".left_clip.lz"); streams_used.insert(".right_clip.lz");
-	streams_used.insert(".flags.lz");
+	streams_used.insert(".flags.lz"); streams_used.insert(".ids.lz");
 
 	// parse head file and get transcript mapping as well as remappings of the 
 	// flags, mapq, and other numerical fields
@@ -209,6 +209,9 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 		else if (suffix.compare(".flags.lz") == 0) {
 			input_streams.flags = shared_ptr<FlagsStream>(new FlagsStream(buf, flag_map, mapq_map, rnext_map) );
 		}
+		else if (suffix.compare(".ids.lz") == 0) {
+			input_streams.readIDs = shared_ptr<ReadIDStream>(new ReadIDStream(buf) );
+		}
 		suffixes.insert(suffix);
 	}
 
@@ -217,12 +220,13 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 		GenomicInterval requested_interval = parseInputInterval(location);
 		// 100mbp - 105mbp --spans blocks for has_edits
 		// GenomicInterval requested_interval(0, 100000000, 105000000);
-		stitchAlignmentsSerial(input_streams, requested_interval, file_name, fname_out, ref_file_name, read_len, transcript_map);
+		stitchAlignmentsSerial(input_streams, requested_interval, file_name, 
+			fname_out, ref_file_name, read_len, transcript_map);
 	}
 	else {
 		// keep stitching alignments while there is data available
 		Decompressor D(file_name, fname_out, ref_file_name, transcript_map);
-		D.decompress(read_len, input_streams, D_SEQ | D_FLAGS);
+		D.decompress(read_len, input_streams, D_SEQ | D_FLAGS | D_READIDS | D_OPTIONAL_FIELDS);
 	}
 }
 

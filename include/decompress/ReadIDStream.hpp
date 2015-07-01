@@ -3,36 +3,41 @@
 
 
 #include <memory>
-#include "decompress/InputBuffer.hpp"
+#include "decompress/InputStream.hpp"
 
 
-class ReadIDStream {
+class ReadIDStream : public InputStream {
+
 public:
-	// ReadIDStream(string & file_name) {
-	// 	read_ids_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + ".ids") );
-	// }
 
-	ReadIDStream(shared_ptr<InputBuffer> in) : read_ids_in(in) {}
+	ReadIDStream(shared_ptr<InputBuffer> buf) : InputStream(buf) {}
 
-	int getNextID(string & id) {
+	string getNextID(int & status) {
 		// exhausted the input stream
-		if ( !read_ids_in->hasMoreBytes() ) return END_OF_STREAM;
+		// cerr << "IDs: " << data_in << endl;
+		if ( !data_in->hasMoreBytes() ) {
+			status = END_OF_STREAM;
+			return "";
+		}
 
-		string chunk;
-		char c = read_ids_in->getNextByte();
-		while (c != '\n' && read_ids_in->hasMoreBytes()) {
+		string chunk = "";
+		char c = data_in->getNextByte();
+		
+		while (c != '\n' && data_in->hasMoreBytes()) {
+			// cerr << c;
 			chunk.push_back(c);
-			c = read_ids_in->getNextByte();
+			c = data_in->getNextByte();
 		}
-		id = chunk;
+		// cerr << "cha" << endl;
 		if (chunk.size() == 0 || c == 0) {
-			return END_OF_STREAM;
+			status = END_OF_STREAM;
+			return "";
 		}
-		return SUCCESS;
+		status = SUCCESS;
+		return chunk;
 	}
 
-private:
-	shared_ptr<InputBuffer> read_ids_in;
+
 };
 
 #endif

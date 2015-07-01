@@ -94,11 +94,6 @@ public:
         is_aligned = (end_s.back() == 't');
     }
 
-    // TrueGenomicInterval(int st_c, int st_off, int end_c, int end_off): 
-    //     start(st_c, st_off),
-    //     end(end_c, end_off)
-    //     {}
-
     void print() {
         cerr << "Interval " << start.chromosome << ":" << start.offset << " to " <<
             end.chromosome << ":" << end.offset << endl;

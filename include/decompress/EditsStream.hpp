@@ -4,11 +4,11 @@
 #include <cassert>
 #include <memory>
 
-#include "InputBuffer.hpp"
+#include "InputStream.hpp"
 
-class EditsStream {
+class EditsStream : public InputStream {
 private:
-	shared_ptr<InputBuffer> edits_in;
+	// shared_ptr<InputBuffer> edits_in;
 
 	int bytes_read = 0;
 
@@ -16,9 +16,7 @@ private:
 
 	size_t alignment_count = 0;
 
-	short read_len = 0;
-
-	char i = sizeof(has_edit_byte) * 8;
+	// short read_len = 0;
 
 	uint8_t has_edit_byte;
 
@@ -36,8 +34,6 @@ private:
 
 		// should never happen since we request that has_edits genomic coordinate is
 		// less than or equal to the earliest edits genomic coordinate
-		// while (edit_num_al < has_edit_num_al) {
-		// }
 		// cerr << edit_num_al << " vs " << has_edits_num_al << endl;
 		assert(edit_num_al >= has_edits_num_al);
 
@@ -57,7 +53,7 @@ public:
 
 	////////////////////////////////////////////////////////////////////////////
 	EditsStream(shared_ptr<InputBuffer> e, shared_ptr<InputBuffer> h):
-		edits_in(e),
+		InputStream(e),
 		has_edits_in(h) {
 		}
 
@@ -72,54 +68,57 @@ public:
 	// equal to the input (target) coordinate
 	////////////////////////////////////////////////////////////////////////////
 	pair<int, unsigned long> seekToBlockStart(int const ref_id, int const start_coord, int const end_coord) {
-		bool transcript_start = false;
-		auto edits_start = edits_in->loadOverlappingBlock(ref_id, start_coord, end_coord, transcript_start);
-		if (edits_start.first < 0) {
-			cerr << "[ERROR] Could not navigate to the begining of the interval" << endl;
-			exit(1);
-		}
+		auto edits_start = InputStream::seekToBlockStart(ref_id, start_coord, end_coord);
+		// cerr << "Edits coord: " << edits_start.first << "," << edits_start.second << endl;
+
 		// pass the start coordinate for the edits block -- this way we can still sync
-		auto has_edits_start = has_edits_in->loadOverlappingBlock(ref_id, edits_start.first, end_coord, transcript_start);
+		bool transcript_start = false;
+		pair<int,unsigned long> has_edits_start;
+		if (ref_id < 0)
+			has_edits_start = has_edits_in->loadOverlappingBlock(ref_id, edits_start.first, 
+				end_coord, transcript_start);
+		else
+			has_edits_start = has_edits_in->loadOverlappingBlock(ref_id, edits_start.first, 
+				end_coord, transcript_start, edits_start.second);
 		if (has_edits_start.first < 0) {
 			cerr << "[ERROR] Could not navigate to the begining of the interval" << endl;
 			exit(1);
 		}
 		// sync these streams
 		auto synced_coord = syncEditStreams(edits_start, has_edits_start);
-		cerr << "Synced edits streams: " << synced_coord.first << ", " << synced_coord.second << endl;
+		// cerr << "Synced edit streams: " << synced_coord.first << ", " << synced_coord.second << endl;
 		return synced_coord;
 	}
-
-	//////////////////////////////////////////////////////////////////////////////////////////////
-	short getReadLen() { return read_len; }
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	size_t getAlignmentCount() {return alignments_expected; }
 
 	//////////////////////////////////////////////////////////////////////////////////////////////
 	vector<uint8_t> getEdits() {
-		uint8_t num_edit_bytes = edits_in->getNextByte();
+		uint8_t num_edit_bytes = data_in->getNextByte();
 		bytes_read++;
-		auto e = edits_in->getNextNBytes(num_edit_bytes);
+		auto e = data_in->getNextNBytes(num_edit_bytes);
 		bytes_read += num_edit_bytes;
 		assert(e.size() == num_edit_bytes);
 		return e;
 	}
 
+	//////////////////////////////////////////////////////////////////////////////////////////////
 	bool hasEdits() {
 		return (has_edit_byte != 0);
 	}
 
 	// byte version
+	//////////////////////////////////////////////////////////////////////////////////////////////
 	int next() {
 		alignment_count++;
 		if ( !has_edits_in->hasMoreBytes() ) {
+			cerr << "no edits at pos: " << alignment_count << endl;
 			return END_OF_STREAM;
 		}
 		has_edit_byte = has_edits_in->getNextByte();
 		return SUCCESS;
 	}
-
 
 };
 

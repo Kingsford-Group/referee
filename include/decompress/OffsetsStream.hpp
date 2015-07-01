@@ -2,13 +2,12 @@
 #define OFFSETS_BUFFER_H
 
 #include <memory>
-#include "decompress/InputBuffer.hpp"
+#include "decompress/InputStream.hpp"
 
 
-class OffsetsStream {
+class OffsetsStream : public InputStream {
 private:
 
-	shared_ptr<InputBuffer> offsets_in;
 	int current_multiplier = 0;
 	int current_offset = 0;
 	int delta = 0;
@@ -17,24 +16,25 @@ private:
 
 public:
 
-	OffsetsStream(shared_ptr<InputBuffer> ib): offsets_in(ib) { }
+	OffsetsStream(shared_ptr<InputBuffer> ib): InputStream(ib) { }
 
 	~OffsetsStream() {
 		// cerr << "OffsetsStream went through " << offsets_cnt << " offsets" << endl;
 	}
 
 	////////////////////////////////////////////////////////////////////////
+	// overrides base class's implementation
+	////////////////////////////////////////////////////////////////////////
 	pair<int, unsigned long> seekToBlockStart(int ref_id, int const start_coord, int const end_coord) {
 		bool is_transcript_start = false;
-		pair<int,unsigned long> p = offsets_in->loadOverlappingBlock(ref_id, start_coord, end_coord, is_transcript_start);
-		auto block_start_coord = p.first;
-		unsigned long block_num_align = p.second;
-		if (block_start_coord < 0) {
+		pair<int,unsigned long> p = data_in->loadOverlappingBlock(ref_id, start_coord, end_coord, is_transcript_start);
+		cerr << "Offsets: " << p.first << "," << p.second << " is_start: " << is_transcript_start << endl;
+		if (p.first < 0) {
 			cerr << "[ERROR] Could not navigate to the begining of the interval" << endl;
 			exit(1);
 		}
 		current_multiplier = 0;
-		current_offset = block_start_coord;
+		current_offset = p.first;
 		delta = 0;	// is delta set correctly?
 		if (is_transcript_start) {
 			// consumes bytes describing the transcript ID
@@ -51,20 +51,20 @@ public:
 
 	////////////////////////////////////////////////////////////////////////
 	bool hasMoreOffsets() {
-		if (!offsets_in->hasMoreBytes() && current_multiplier == 0 ) return false;
+		if (!data_in->hasMoreBytes() && current_multiplier == 0 ) return false;
 		return true;
 	}
 
 	////////////////////////////////////////////////////////////////////////
 	int getNextTranscript() {
-		if ( !offsets_in->hasMoreBytes() ) return END_OF_STREAM;
+		if ( !data_in->hasMoreBytes() ) return END_OF_STREAM;
 		current_offset = 0;
 
 		vector<uint8_t> chunk;
-		char c = offsets_in->getNextByte();
-		while (c != ' ' && offsets_in->hasMoreBytes()) {
+		char c = data_in->getNextByte();
+		while (c != ' ' && data_in->hasMoreBytes()) {
 			chunk.push_back(c);
-			c = offsets_in->getNextByte();
+			c = data_in->getNextByte();
 		}
 		if (chunk.size() == 0 || c==0) {
 			cerr << "getting next transcript: no data" << endl;
@@ -104,9 +104,9 @@ public:
 			return current_offset;
 		}
 		else {
-			if ( !offsets_in->hasMoreBytes() ) return END_OF_STREAM;
+			if ( !data_in->hasMoreBytes() ) return END_OF_STREAM;
 			vector<uint8_t> chunk;
-			char c = offsets_in->getNextByte();
+			char c = data_in->getNextByte();
 			if (c == 0) {
 				return END_OF_STREAM;
 			}
@@ -115,9 +115,9 @@ public:
 				current_transcript = -1;
 				return END_OF_TRANS;
 			}
-			while (c != ' ' && c != ':' && c != '\n' && offsets_in->hasMoreBytes() ) {
+			while (c != ' ' && c != ':' && c != '\n' && data_in->hasMoreBytes() ) {
 				chunk.push_back( c );
-				c = offsets_in->getNextByte();
+				c = data_in->getNextByte();
 			}
 			if (c == '\n') {
 				cerr << "end of line" << endl;
@@ -129,10 +129,10 @@ public:
 			// now parse the multiplier if it exists
 			if (c == ':') {
 				chunk.clear();
-				c = offsets_in->getNextByte();
-				while (c != ' ' && c != '\n' && offsets_in->hasMoreBytes()) {
+				c = data_in->getNextByte();
+				while (c != ' ' && c != '\n' && data_in->hasMoreBytes()) {
 					chunk.push_back(c);
-					c = offsets_in->getNextByte();
+					c = data_in->getNextByte();
 				}
 				if (c == '\n') {
 					cerr << "end of line" << endl;

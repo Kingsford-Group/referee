@@ -1,5 +1,5 @@
-#ifndef INPUT_STREAM_LIB_H
-#define INPUT_STREAM_LIB_H
+#ifndef INPUT_BUFFER_LIB_H
+#define INPUT_BUFFER_LIB_H
 
 #include <vector>
 #include <queue>
@@ -151,6 +151,7 @@ class InputBuffer {
 	int buffer_size;
 
 	void readMoreLZIPBlocks() {
+		cerr << "read mode blocks " << name << " q: " << block_queue.size() << endl;
 		if (block_queue.size() > 0) {
 			auto block = block_queue.front();
 			block_queue.pop_front();
@@ -222,14 +223,8 @@ class InputBuffer {
 			exit(1);
 		}
 		shared_ptr<vector<uint8_t>> raw_bytes(new vector<uint8_t>(block.block_size) );
-		cerr << "reading bytes from input stream" << endl;
-		f_in.read( (char *) &(*raw_bytes)[0], block.block_size);
-		cerr << "read " << f_in.gcount() << " bytes\nunzipping binary data" << endl;
+		f_in.read( (char *) &(*raw_bytes)[0], block.block_size);;
 		auto unzipped_data = unzipData(raw_bytes, block.decompressed_size);
-		cerr << name << ": decompressed " << block.block_size << " to " << block.decompressed_size << " bytes" << endl;
-		cerr << "first 10 bytes are: ";
-		for (int i = 0; i < 10; i++) cerr << (int) unzipped_data[i] << " ";
-		cerr << endl;
 		return unzipped_data;
 	}
 
@@ -272,7 +267,8 @@ class InputBuffer {
 				// start and end chromosome are the same and equal prev_chromo
 				chromo_intervals.emplace_back(
 					block.offset, block.compressed_size, block.decompressed_size,
-					interval.start.chromosome, interval.start.offset, interval.end.offset, interval.num_alignments, interval.is_aligned);
+					interval.start.chromosome, interval.start.offset, interval.end.offset, 
+					interval.num_alignments, interval.is_aligned);
 				// moving on...
 			}
 			else {
@@ -338,15 +334,44 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////
-	//
+	// if at_num_alignments is >= 0 -- it should take precedence over chromo
 	////////////////////////////////////////////////////////////////
 	pair<int,unsigned long> loadOverlappingBlock(int const chromo, int const start_coord, int const end_coord,
-		bool & is_transcript_start) {
+		bool & is_transcript_start, int const at_num_alignments = -1) {
 		cerr << "Loading an overlapping block for: " << name << endl;
 		bytes.clear();
 		block_queue.clear();
 
-		if (chromo == -1) {
+		if (at_num_alignments >= 0) {
+			cerr << "choosing block by a number of alignments" << endl;
+			RawDataInterval * start_block;
+			bool found_block = false;
+			for (auto tree_p : chromosome_trees) {
+				auto tree = tree_p.second;
+				for (auto block : tree.intervals ) {
+					if (block.num_alignments < at_num_alignments) {
+						start_block = &block;
+					}
+					else {
+						// previous block contained the needed point
+						found_block = true;
+						break;
+					}
+				}
+				if (found_block) break;
+			}
+			if (!found_block) {
+				cerr << "[error] Could not find a starting block that aligns with the given number of alignments" << endl;
+				exit(1);
+			}
+
+			is_transcript_start = start_block->isAlignedWithTranscriptStart();
+			auto unzipped_data = decompressBlock(*start_block);
+			for (auto b : unzipped_data) bytes.push_back(b);
+			return make_pair(start_block->start, start_block->num_alignments);
+		}
+		else if (chromo == -1) {
+			cerr << "Loading the very first block" << endl;
 			// add all blocks from all trees (in order) to the block queue
 			for (auto tree_p : chromosome_trees) {
 				auto tree = tree_p.second;
@@ -360,7 +385,7 @@ public:
 						block_queue.push_back(b);
 				}
 			}
-			cerr << "Added block to queue" << endl;
+			// cerr << "Added block to queue" << endl;
 
 			// decompress the first one
 			RawDataInterval block = block_queue.front();

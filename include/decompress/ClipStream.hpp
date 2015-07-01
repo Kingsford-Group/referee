@@ -3,29 +3,16 @@
 
 #include <memory>
 
-#include "InputBuffer.hpp"
+#include "decompress/InputStream.hpp"
 
 
-class ClipStream {
+class ClipStream : public InputStream {
+
+	string current_clip;
+
 public:
-	// ClipStream(string & file_name, char const * suffix) {
-	// 	clips_in = shared_ptr<InputBuffer>(new InputBuffer(file_name + suffix) );
-	// }
 
-	ClipStream(shared_ptr<InputBuffer> ib): clips_in(ib) {}
-
-	pair<int, unsigned long> seekToBlockStart(int const ref_id, int const start_coord, int const end_coord) {
-		cerr << "Clips buf: " << clips_in << endl;
-		bool t = false;
-		auto start = clips_in->loadOverlappingBlock(ref_id, start_coord, end_coord, t);
-		cerr << "loaded overlapping block" << endl;
-		if (start.first < 0) {
-			cerr << "[ERROR] Could not navigate to the begining of the interval" << endl;
-			exit(1);
-		}
-		return start;
-	}
-
+	ClipStream(shared_ptr<InputBuffer> ib): InputStream(ib) {}
 
 	string peekNext() {
 		// cerr << "current_clip: " << current_clip;
@@ -33,12 +20,12 @@ public:
 	}
 
 	int getNext(string & clip) {
-		if ( !clips_in->hasMoreBytes() ) return END_OF_STREAM;
+		if ( !data_in->hasMoreBytes() ) return END_OF_STREAM;
 		string chunk;
-		char c = clips_in->getNextByte();
-		while (c != '\n' && clips_in->hasMoreBytes()) {
+		char c = data_in->getNextByte();
+		while (c != '\n' && data_in->hasMoreBytes()) {
 			chunk.push_back(c);
-			c = clips_in->getNextByte();
+			c = data_in->getNextByte();
 		}
 		clip = chunk;
 		// cerr << "Clip: " << clip << endl;
@@ -49,9 +36,6 @@ public:
 		return SUCCESS;
 	}
 
-private:
-	shared_ptr<InputBuffer> clips_in;
-	string current_clip;
 };
 
 #endif
