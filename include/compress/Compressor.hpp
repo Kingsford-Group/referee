@@ -52,26 +52,16 @@ public:
 	shared_ptr<OutputBuffer> unaligned_buf;
 
 	void flush() {
-		// cerr << "flush 1 ";
 		offsets_buf->flush();
-		// cerr << "flush 2 ";
 		edits_buf->flush();
 		has_edits_buf->flush();
-		// cerr << "flush 3 ";
 		left_clips_buf->flush();
-		// cerr << "flush 4 ";
 		right_clips_buf->flush();
-		// cerr << "flush 5 ";
 		unaligned_buf->flush();
-		// cerr << "done w/ seq ";
 		if (!seq_only) {
-			// cerr << "flush 6 ";
 			flags_buf->flush();
-			// cerr << "flush 7 ";
 			ids_buf->flush();
-			// cerr << "flush 8 ";
 			quals_buf->flush(); // causes individual clusters to flush their OutputBuffers; notify the courier
-			// cerr << "flush 9 ";
 			opt_buf->flush();
 		}
 	}
@@ -116,72 +106,6 @@ public:
 //
 ////////////////////////////////////////////////////////////////
 class Compressor {
-public:
-	////////////////////////////////////////////////////////////////
-	//
-	////////////////////////////////////////////////////////////////
-	Compressor (string const & file_name, string const & ref_file, int t, 
-			Output_args & output_buffers, 
-			bool seq_only, bool discard_secondary):
-		parser(file_name, t),
-		ref_seq_handler(file_name, ref_file, "-c"),
-		out_buffers(output_buffers),
-		file_name(file_name),
-		seq_only(seq_only),
-		discard_secondary_alignments(discard_secondary) {
-		failed_ = parser.failed();
-	}
-
-	bool failed() {return failed_;}
-
-	////////////////////////////////////////////////////////////////
-	//
-	////////////////////////////////////////////////////////////////
-	void compress() {
-		bool first = true;
-
-		ofstream head_out(file_name + ".head");
-		/*SAM_hdr*/ auto* h = parser.header();
-		auto num_ref = h->nref;
-		for (auto i = 0; i < num_ref; i++) {
-			ref_seq_handler.setMapping(i, h->ref[i].name);
-			head_out << i << " " << h->ref[i].name << endl;
-		}
-		
-
-		int line_id = 0;
-		IOLibAlignment last_aligned;
-	    while ( parser.read_next() ) {
-	        bam_seq_t* read = parser.getRead();
-	        IOLibAlignment al(read);
-	        if ( al.isUnalined() ) {
-	        	unaligned_cnt++;
-	            processUnalignedRead(al);
-	        }
-	        else {
-	        	last_aligned = al;
-	        	if (first) {
-	        		head_out << "read_len=" << al.read_len() << endl;
-	        		head_out.close();
-	        	}
-	            processRead(al, first);
-	            first = false;
-	        }
-	        line_id++;
-	    }
-	    out_buffers.setLastCoordinate(last_aligned.ref(), last_aligned.offset(), count);
-	    flushUnalignedReads();
-	    parser.close();
-	    cerr << "Of them unaligned: " << unaligned_cnt << endl;
-	    if (discard_secondary_alignments)
-	    	cerr << "Unique total reads: " << count << endl;
-
-	    cerr << "Total edits: " << edit_count << endl;
-
-	    // output the last offset
-	    outputPair(offset_pair, prev_ref, prev_offset);
-	    // processHasEditsBits(edit_flags, file_name);
-	}
 
 ////////////////////////////////////////////////////////////////
 //
@@ -204,9 +128,11 @@ private:
 	// reference sequence
 	TranscriptsStream ref_seq_handler;
 
-	// parser
+	// SAM parser
 	IOLibParser parser;
+
 	int unaligned_cnt = 0;
+
 	int prev_offset = 0;
 	int prev_ref = -1;
 	// records offset from the previous alignment and the number of times we observe this offset
@@ -454,14 +380,16 @@ private:
 			flags_map[flags] = flags_i++; 	// insert and increment
 		}
 		flags = flags_map[flags];
+
 		// new mapq value
 		if ( mapq_map.find(mapq) == mapq_map.end() ) {
 			mapq_map[mapq] = mapq_i++; 	// insert and increment
 		}
 		mapq = mapq_map[mapq];
+
 		// new rnext value
 		if ( rnext_map.find(rnext) == rnext_map.end() ) {
-			rnext_map[flags] = rnext_i++; 	// insert and increment
+			rnext_map[rnext] = rnext_i++; 	// insert and increment
 		}
 		rnext = rnext_map[rnext];
 
@@ -637,6 +565,87 @@ private:
 	    
 	    return al.isRejected();
 	}
+
+////////////////////////////////////////////////////////////////
+//
+// Public methods and variables
+//
+////////////////////////////////////////////////////////////////
+public:
+	////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////
+	Compressor (string const & file_name, string const & ref_file, int t, 
+			Output_args & output_buffers, 
+			bool seq_only, bool discard_secondary):
+		parser(file_name, t),
+		ref_seq_handler(file_name, ref_file, "-c"),
+		out_buffers(output_buffers),
+		file_name(file_name),
+		seq_only(seq_only),
+		discard_secondary_alignments(discard_secondary) {
+		failed_ = parser.failed();
+	}
+
+	bool failed() {return failed_;}
+
+	////////////////////////////////////////////////////////////////
+	//
+	////////////////////////////////////////////////////////////////
+	void compress() {
+		// cerr << "Running compressor" << endl;
+		bool first = true;
+
+		ofstream head_out(file_name + ".head");
+		/*SAM_hdr*/ auto* h = parser.header();
+		auto num_ref = h->nref;
+		for (auto i = 0; i < num_ref; i++) {
+			// cerr << "i=" << i << " " << h->ref[i].name << endl;
+			ref_seq_handler.setMapping(i, h->ref[i].name);
+			head_out << i << " " << h->ref[i].name << endl;
+		}
+
+		// cerr << "==========" << endl;
+
+		int line_id = 0;
+		IOLibAlignment last_aligned;
+	    while ( parser.read_next() ) {
+	        bam_seq_t* read = parser.getRead();
+	        IOLibAlignment al(read);
+	        if ( al.isUnalined() ) {
+	        	unaligned_cnt++;
+	            processUnalignedRead(al);
+	        }
+	        else {
+	        	last_aligned = al;
+	        	if (first) {
+	        		head_out << "read_len=" << al.read_len() << endl;
+	        		// head_out.close();
+	        	}
+	            processRead(al, first);
+	            first = false;
+	        }
+	        line_id++;
+	    }
+	    out_buffers.setLastCoordinate(last_aligned.ref(), last_aligned.offset(), count);
+	    flushUnalignedReads();
+	    parser.close();
+	    cerr << "Of them unaligned: " << unaligned_cnt << endl;
+	    if (discard_secondary_alignments)
+	    	cerr << "Unique total reads: " << count << endl;
+	    cerr << "Total edits: " << edit_count << endl;
+
+	    // write out mappings for the flags, mapq, rnext
+	    for (auto p : flags_map) head_out << "flags " << p.first << " " << p.second << endl;
+	    for (auto p : mapq_map) head_out << "mapq " << p.first << " " << p.second << endl;
+	    for (auto p : rnext_map) head_out << "rnext " << p.first << " " << p.second << endl;
+	    head_out.close();
+
+	    // output the last offset
+	    outputPair(offset_pair, prev_ref, prev_offset);
+	    // processHasEditsBits(edit_flags, file_name);
+	}
+
 };
 
 #endif

@@ -49,7 +49,7 @@ class TranscriptsStream {
 	int read_len = 0;
 
 	////////////////////////////////////////////////////////////////
-	//
+	// build a fai index for a file
 	////////////////////////////////////////////////////////////////
 	void indexFile(string const & fname, unordered_map<string,FaiEntry> & map) {
 		ifstream f_in(fname);
@@ -136,6 +136,8 @@ class TranscriptsStream {
 
 	////////////////////////////////////////////////////////////////
 	// read index for the reference and stores offsets
+	// expect the file to be small, so it's ok to read it the slow way:
+	// line by line
 	////////////////////////////////////////////////////////////////
 	unordered_map<string,FaiEntry> readFAI(string const & fname) {
 		unordered_map<string,FaiEntry> fai_index;
@@ -180,38 +182,6 @@ class TranscriptsStream {
 	}
 
 	////////////////////////////////////////////////////////////////
-	// TODO: parse using libstaden
-	// mapping from ref_id to a reference_name (e.g. 0 -> chr10)
-	////////////////////////////////////////////////////////////////
-	unordered_map<int, string> parseTranscriptIDsPlain(string const & fname) {
-		unordered_map<int,string> t_map;
-		reverse_map.clear();
-		ifstream f_in(fname);
-		check_file_open(f_in, fname);
-		cerr << "[INFO] Reading reference sequence name mapping." << endl;
-
-		int t_index = 0;
-		string line, t_name, type, chromo;
-		while (getline(f_in, line)) {
-			if (line.find("read_len=") == string::npos ) {
-				auto idx = line.find_first_of(separator);
-				type = line.substr(0, idx);
-				t_index = stoi(type);
-				chromo = line.substr(idx+1);
-				t_map[t_index] = chromo;
-				reverse_map[chromo] = t_index;
-			}
-			else {
-				// read len
-				auto idx = line.find("=");
-				read_len = stoi(line.substr(idx+1));
-			}
-		}
-		f_in.close();
-		return t_map;
-	}
-
-	////////////////////////////////////////////////////////////////
 	//
 	////////////////////////////////////////////////////////////////
 	shared_ptr<string> readTranscriptSequence(string const & ref_name, FaiEntry & entry) {
@@ -252,14 +222,17 @@ class TranscriptsStream {
 public:
 
 	////////////////////////////////////////////////////////////////
-	TranscriptsStream (string const & file_name, string const & ref, string const mode): ref_path(ref) {
+	TranscriptsStream (string const & file_name, string const & ref, string const mode,
+		unordered_map<int, string> const & Ts = {{0, "" }}) : ref_path(ref) {
 		if (mode.compare("-c") == 0) {
 			// if compressing: build a t_map
 		}
 		else {
 			// if decompressing: read a t_map
-			t_map = parseTranscriptIDsPlain(file_name + ".head");
-			// TODO: also: read dictionaries for the flags
+			// t_map = parseTranscriptIDsPlain(file_name + ".head");
+			t_map = Ts;
+			reverse_map.clear();
+			for (auto p : t_map) reverse_map[p.second] = p.first;
 		}
 		fai_index = readFAI(ref);
 	}

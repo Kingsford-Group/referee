@@ -21,7 +21,7 @@ struct Parser_args {
 
 ////////////////////////////////////////////////////////////////
 void * parseSAM( void * pa) {
-	// cerr << "parser" << endl;
+	// cerr << "parser Launched" << endl;
 	const Parser_args & tmp = *(Parser_args *)pa;
 
 	Packet_courier * courier = tmp.courier;
@@ -29,6 +29,7 @@ void * parseSAM( void * pa) {
 	// will write out a BAM/SAM header
 	Compressor c(tmp.file_name, tmp.ref_file_name, tmp.num_parsing_threads, outs, 
 			tmp.seq_only, tmp.discard_secondary_alignments);
+	// cerr << "created compressor successfully" << endl;
 	if (c.failed() ) {
 		cerr << "[INFO] Terminating. " << endl;
 		courier->finish();
@@ -87,6 +88,8 @@ void compressFile(string & file_name, string const & ref_file_name, const int nu
 	// open output streams
 	Output_args output_args = initializeOutputStreams(file_name, seq_only, discard_secondary_alignments, &courier);
 
+	// cerr << "Initialized output streams" << endl;
+
 	// from plzip library implementation
 	// initialize parsing thread -- pass courier, FDs for output
 	Parser_args parser_args;
@@ -119,6 +122,8 @@ void compressFile(string & file_name, string const & ref_file_name, const int nu
 			show_error( "Can't create worker threads", errcode ); cleanup_and_fail(); 
 		}
 	}
+
+	// cerr << "launched threads" << endl;
 
 	// concurrently wait for threads to return compressed packets; write them to disk
 	muxer(courier);

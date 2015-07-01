@@ -251,7 +251,8 @@ class InputBuffer {
 		vector<MyBlock> & lzip_blocks,
 		map<chromo_id_t, IntervalTree<int,int> > & chromosome_trees) {
 
-		assert(lzip_blocks.size() == genomic_intervals->size());
+		// cerr << lzip_blocks.size() << " gen: " << genomic_intervals->size() << endl;
+		assert(lzip_blocks.size() <= genomic_intervals->size());
 
 		int prev_chromo = genomic_intervals->at(0).start.chromosome;
 		vector<RawDataInterval> chromo_intervals;
