@@ -1,10 +1,17 @@
 import sys
 import numpy as np
+import matplotlib
 import matplotlib.pyplot as plt
 
 files = {}
 
 # output = sys.argv[2]
+# expected format:
+# file, SRR123
+# method, methodXXX
+# quals, <size-in-bytes>
+# seq, <size-in-bytes>
+# ...
 print "Reading sizes from", sys.argv[1]
 fields = []
 with open(sys.argv[1], "r") as f:
@@ -63,6 +70,10 @@ for field, arr in fields.iteritems():
 	bottoms += Y
 	i+=1
 
+# change fonts to Type 1
+# they are type 3 by default
+matplotlib.rcParams['pdf.fonttype'] = 42
+matplotlib.rcParams['ps.fonttype'] = 42
 
 plt.ylabel('Size, % of total')
 # plt.yscale("log")
