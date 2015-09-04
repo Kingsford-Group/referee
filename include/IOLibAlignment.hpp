@@ -518,7 +518,7 @@ private:
 
 			// some adjustments for insertion/deletion
 			int ins = 0;
-			bool adjusted = (offset() == 18964285 || offset() == 18964284 || offset() == 18964286);
+			// bool adjusted = (offset() == 18964285 || offset() == 18964284 || offset() == 18964286);
 			// int clipped_bases = this->left_clip.size() + this->left_hard_clip;
 			// cerr << "merged: ";
 			auto seq = bam_seq(read);
@@ -528,17 +528,17 @@ private:
 					// if (adjusted)
 						// cerr << "ins adj off=" << offset() << " ";
 
-					if (adjusted)
-						cerr << "PRE (" << p.edit_op << "," << p.edit_pos << ") ";
+					// if (adjusted)
+					// 	cerr << "PRE (" << p.edit_op << "," << p.edit_pos << ") ";
 
 					p.edit_op = bit2char( bam_seqi(seq, p.edit_pos + ins) );
 					// p.edit_pos += ins;
-					if (adjusted)
-						cerr << "AFT (" << p.edit_op << "," << p.edit_pos << ") ";
+					// if (adjusted)
+						// cerr << "AFT (" << p.edit_op << "," << p.edit_pos << ") ";
 				}
 			}
-			if (adjusted)
-				cerr << endl;
+			// if (adjusted)
+				// cerr << endl;
 		}
 	}
 };
