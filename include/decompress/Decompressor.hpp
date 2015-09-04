@@ -428,15 +428,16 @@ private:
 		int offset_since_last_md = 0;
 		int splice_offset = 0;
 		int last_abs_pos = 0, Ds = 0, Is = 0; // number of deletions
-		bool first_md_edit = true;
+		bool first_md_edit = true, first_cigar_was_clip = false;
 		
 		
-		if (offset == 18964285 ||offset == 18964286 || offset == 18964284) {
-			cerr << "len=" << edits.size() << " off=" << offset << " ";
-			for (auto e : edits)
-				cerr << (int)e << " ";
-			cerr << endl;
-		}
+		// if (offset == 18964285 ||offset == 18964286 || offset == 18964284) {
+		// 	cerr << "len=" << edits.size() << " off=" << offset << " ";
+		// 	for (auto e : edits)
+		// 		cerr << (int)e << " ";
+		// 	cerr << endl;
+		// 	cerr << "read: " << read << endl;
+		// }
 
 		uint8_t op;
 		while (j < edits.size() ) {
@@ -445,6 +446,7 @@ private:
 				// cerr << op << " ";
 			switch (op) {
 				case 'L': {
+					first_cigar_was_clip = true;
 					string left_clip;
 					if (left_clips == nullptr) {
 						// clipped data not available
@@ -482,6 +484,7 @@ private:
 				break;
 				case 'l': {
 					j++;
+					first_cigar_was_clip = true;
 					// update the read (shorten)
 					read = read.substr(edits[j]);
 					// update cigar string
@@ -618,6 +621,8 @@ private:
 						read.insert(read.begin() + last_abs_pos, reverseReplace(edits[j]) );// insert a single char
 						j += 2;
 						first_i = false;
+						 // adjust by one base for every insert
+						last_abs_pos++;
 					}
 					j--;
 					assert(j < edits.size());
@@ -638,22 +643,28 @@ private:
 				}
 				break;
 				default: {
-					// TODO: handle mismatches
+					// handle mismatches
 					j++;
 					if (first_md_edit) {
 						// cerr << "(+" << (int)edits[j] + Is << ") ";
-						md_string += to_string(edits[j]);
+						if (first_cigar_was_clip) {
+							md_string += to_string(edits[j]);
+							last_md_edit_pos += edits[j] + 1;
+						}
+						else {
+							md_string += to_string(edits[j] + last_cigar_edit_pos - Is);
+							last_md_edit_pos += edits[j] + last_cigar_edit_pos + 1;
+						}
 						first_md_edit = false;
-						last_md_edit_pos += edits[j] + 1;
+						
 					}
 					else {
 						// cerr << "(+" << (int)edits[j]-1+Is << ") ";
 						md_string += to_string(edits[j] - 1);
 						last_md_edit_pos += edits[j];
 					}
-					last_abs_pos += edits[j] + Is;
+					last_abs_pos += edits[j];
 					// add the letter we see in the reference to the MD string
-					// cerr << "last abs pos: " << last_abs_pos << " ";
 					md_string += read[last_abs_pos];
 					// add correct read to have its original base
 					read[last_abs_pos] = op;

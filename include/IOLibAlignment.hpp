@@ -423,7 +423,7 @@ private:
 		string ref_seq = ts.getTranscriptSequence(this->ref(), this->offset(), read_seq.size());
 		for (int i = 0; i < read_seq.size(); i++) {
 			if (read_seq[i] != ref_seq[i]) {
-				// mismatch -- record the letter that appear in the read at position i
+				// mismatch -- record the letter that appears in the read at position i
 				md_edits.push_back( edit_pair(read_seq[i], i) ); 
 			}
 		}
@@ -518,19 +518,27 @@ private:
 
 			// some adjustments for insertion/deletion
 			int ins = 0;
+			bool adjusted = (offset() == 18964285 || offset() == 18964284 || offset() == 18964286);
 			// int clipped_bases = this->left_clip.size() + this->left_hard_clip;
 			// cerr << "merged: ";
 			auto seq = bam_seq(read);
-			for (auto p : merged_edits) {
+			for (auto& p : merged_edits) {
 				if (p.edit_op >= 'V' && p.edit_op <= 'Z') ins++;
 				if (isMismatch(p.edit_op) && ins > 0) {
-					// cerr << "ins adj ";
+					// if (adjusted)
+						// cerr << "ins adj off=" << offset() << " ";
+
+					if (adjusted)
+						cerr << "PRE (" << p.edit_op << "," << p.edit_pos << ") ";
+
 					p.edit_op = bit2char( bam_seqi(seq, p.edit_pos + ins) );
 					// p.edit_pos += ins;
-					// cerr << "(" << p.edit_op << "," << p.edit_pos << ") ";
+					if (adjusted)
+						cerr << "AFT (" << p.edit_op << "," << p.edit_pos << ") ";
 				}
 			}
-			// cerr << endl;
+			if (adjusted)
+				cerr << endl;
 		}
 	}
 };

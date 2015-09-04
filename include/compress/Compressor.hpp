@@ -189,8 +189,6 @@ private:
 		if ( !al.isPrimary() && discard_secondary_alignments ) return false;
 
 		bool hasEdits = al.handleEdits(ref_seq_handler);
-		// TODO: if MD string is not available with the optional fields
-		// make sure we know where mismatches are
 
 		// return early if no edits or can not encode the edits for some reason
 		if (al.isRejected() || !hasEdits) {
