@@ -40,9 +40,6 @@ endif
 
 all: $(EXE)
 
-plzipso:
-	$(CC) -shared -fPIC -o libplzip.so $SRC $PLZINCLUDE $PLZLIBS
-	export DYLD_LIBRARY_PATH=plzip/:$DYLD_LIBRARY_PATH
 $(EXE):
 	$(CC) $(CFLAGS) $(CCPARALL) $(LDFLAGS) -o $(BIN)/$@ $(SRC) $(INCLUDE) $(TBBINCL) $(LIBS) $(TBBLIBS)
 clean:

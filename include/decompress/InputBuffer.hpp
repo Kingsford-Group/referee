@@ -182,10 +182,21 @@ class InputBuffer {
   		// scan until cursor reaches the begining of the file
   		while (pos > 0) {
   			f_in.seekg( -member_size - File_trailer::size, f_in.cur);
+  			// cerr << "tellg after seeking: " << f_in.tellg() << " ";
+
   			// read trailer
+  			// cerr << "f_trailer: " << File_trailer::size << " ||| ";
 			f_in.read( (char *) trailer.data, File_trailer::size);
+
+			// for (int i = 0; i < File_trailer::size; i++)
+			// 	cerr << (int)trailer.data[i] << " ";
+			// cerr << endl;
+
+			// cerr << "tellg after read: " << f_in.tellg() << " ";
+
 			// block size
 			member_size = trailer.member_size();
+			// cerr << "member size: " << member_size << " ";
 			auto data_size = trailer.data_size();
 			pos -= member_size;
 			total += member_size;
@@ -199,6 +210,7 @@ class InputBuffer {
 				cerr << "[ERROR] Input error: " << e.what() << " " << /*e.code() <<*/ endl;
 			}
 		}
+		// cerr << "Total: " << total << " file_len: " << file_len << endl;
 		assert(total == file_len);
 		reverse( blocks.begin(), blocks.end() );
 		return blocks;

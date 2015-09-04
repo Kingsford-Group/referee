@@ -177,11 +177,11 @@ public:
 		for (auto m : cluster_membership) cluster_out << m << " ";
 		cluster_out.close();
 
-		cerr << endl << "Total times in d2 loops: " << elapsed_seconds_d2_loop1.count() << "," <<
-			elapsed_seconds_d2_loop2.count() << "," << elapsed_seconds_d2_loop3.count() << "sec" << endl;
-		cerr << "Total mode time: " << elapsed_mode_time.count() << "s" << endl;
-		cerr << "Total trimming time: " << elapsed_trim_ends.count() << "s" << endl;
-		cerr << "Total writing time: " << elapsed_writes.count() << "s" << endl;
+		// cerr << endl << "Total times in d2 loops: " << elapsed_seconds_d2_loop1.count() << "," <<
+			// elapsed_seconds_d2_loop2.count() << "," << elapsed_seconds_d2_loop3.count() << "sec" << endl;
+		// cerr << "Total mode time: " << elapsed_mode_time.count() << "s" << endl;
+		// cerr << "Total trimming time: " << elapsed_trim_ends.count() << "s" << endl;
+		// cerr << "Total writing time: " << elapsed_writes.count() << "s" << endl;
 	}
 
 	///////////////////////////////////////////////////////////
@@ -192,9 +192,9 @@ public:
 		if (observed_vectors <= bootstrap_size) {
 			assignQualityVector(s, len, observed_vectors);
 			if (observed_vectors == bootstrap_size) {
-				cerr << "Time in d2: loop1 " << elapsed_seconds_d2_loop1.count() << "s" << endl;
-				cerr << "Time in d2: loop2 " << elapsed_seconds_d2_loop2.count() << "s" << endl;
-				cerr << "Time in d2: loop3 " << elapsed_seconds_d2_loop3.count() << "s" << endl;
+				// cerr << "Time in d2: loop1 " << elapsed_seconds_d2_loop1.count() << "s" << endl;
+				// cerr << "Time in d2: loop2 " << elapsed_seconds_d2_loop2.count() << "s" << endl;
+				// cerr << "Time in d2: loop3 " << elapsed_seconds_d2_loop3.count() << "s" << endl;
 				// exit(1);
 				refineClusters();
 			}
@@ -340,10 +340,10 @@ private:
 		vector<int> remove;
 		cerr << "[INFO] Filtering clusters that are too small..." << endl;
 		for (auto i = 0; i < clusters.size(); i++) {
-			cerr << i << " ";
+			// cerr << i << " ";
 			auto clust = clusters[i];
 			float percent = clust->size() / (float)observed_vectors;
-			cerr << percent << " ";
+			// cerr << percent << " ";
 			if (percent > percent_abundance) { // one percent
 				clust->setClusterID(clust_id);
 				cerr << "Cluster " << clust_id << ": " << (percent * 100) << "% of vectors seen so far" << endl;
@@ -354,14 +354,14 @@ private:
 			else {
 				remove.push_back(i);
 				// reassign cluster's data to the "others" pile
-				cerr << "merging ";
+				// cerr << "merging ";
 				// TODO: merge
 				// others->mergeCluster(clust);
 				// for (auto v : clust->data) {
 				// 	others->data.push_back(v);
 				// }
 				// cluster membership is in the sh-pile by default -- no need to update
-				cerr << "next ";
+				// cerr << "next ";
 			}
 		}
 		// merge vectors in the clusters that were too small into a sh*tpile

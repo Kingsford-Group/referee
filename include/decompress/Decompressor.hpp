@@ -19,6 +19,7 @@
 #include "QualityStream.hpp"
 // #include "MergedEditsStream.hpp"
 #include "TranscriptsStream.hpp"
+#include "RefereeHeader.hpp"
 
 
 
@@ -57,6 +58,15 @@ struct InputStreams {
 class Decompressor {
 
 	unordered_map<int,string> t_map;
+
+	void write_sam_header(ofstream & recovered_file, RefereeHeader & header) {
+		// write version, sorting info (alignments always sorted by coord)
+		recovered_file << "@HD\t" << header.get_version() << "\tSO:coordinate" << endl;
+		for (auto t_id : header.getTranscriptIDs() ) {
+			recovered_file << "@SQ\tSN:" << header.getMapping(t_id) << 
+				"\tLN:" << header.getTranscriptLength(t_id) << endl;
+		}
+	}
 
 	////////////////////////////////////////////////////////////////////////////
 	// sync the streams
@@ -125,25 +135,25 @@ public:
 	Decompressor(
 		string const & input_fname,
 		string const & output_fname,
-		string const & ref_path,
-		unordered_map<int,string> const & Ts):
-		file_name(input_fname),
-		output_name(output_fname),
-		ref_path(ref_path),
-		t_map(Ts) { }
+		string const & ref_path):
+			file_name(input_fname),
+			output_name(output_fname),
+			ref_path(ref_path) { }
 
 	////////////////////////////////////////////////////////////////////////////
 	// Reconstruct SAM file by combining the inputs; restoring reads and quals
 	////////////////////////////////////////////////////////////////////////////
-	void decompress(int read_len, InputStreams & is, uint8_t const options) {
+	void decompress(RefereeHeader & header, InputStreams & is, uint8_t const options) {
 		// sequence-specific streams
-		// read_len = is.edits->getReadLen();
+		int read_len = header.getReadLen();
+		auto t_map = header.getTranscriptIDsMap();
 		cerr << "[decompress the entire contents]" << endl;
 		cerr << "Read length:\t" << (int)read_len << endl;
 		assert(read_len > 0);
 		TranscriptsStream transcripts(file_name, ref_path, "-d", t_map);
 		recovered_file.open( output_name.c_str() );
 		check_file_open(recovered_file, file_name);
+		write_sam_header(recovered_file, header);
 
 		// prime the first blocks in every stream
 		is.offs->seekToBlockStart(-1, 0, 0);
@@ -200,8 +210,10 @@ public:
 	////////////////////////////////////////////////////////////////
 	// Decompress alignments within a given interval
 	////////////////////////////////////////////////////////////////
-	void decompressInterval(GenomicInterval interval, int read_len, InputStreams & is,
+	void decompressInterval(GenomicInterval interval, RefereeHeader & header, InputStreams & is,
 		const uint8_t options) {
+		int read_len = header.getReadLen();
+		auto t_map = header.getTranscriptIDsMap();
 		TranscriptsStream transcripts(file_name, ref_path, "-d", t_map);
 		recovered_file.open( output_name.c_str() );
 		if (!recovered_file) {
@@ -418,12 +430,13 @@ private:
 		int last_abs_pos = 0, Ds = 0, Is = 0; // number of deletions
 		bool first_md_edit = true;
 		
-		// cerr << " len=" << edits.size() << endl;
-		// if (offset == 57509325) {
-		// 	for (auto e : edits)
-		// 		cerr << (int)e << " ";
-		// 	cerr << endl;
-		// }
+		
+		if (offset == 18964285 ||offset == 18964286 || offset == 18964284) {
+			cerr << "len=" << edits.size() << " off=" << offset << " ";
+			for (auto e : edits)
+				cerr << (int)e << " ";
+			cerr << endl;
+		}
 
 		uint8_t op;
 		while (j < edits.size() ) {
@@ -583,7 +596,7 @@ private:
 					/* insert bases into the reference to recover the original read */
 					// TODO: if several Is in a row -- need to handle them together
 					// if Is are disjoint -- will handle them separately
-					// TODO: is more than one I in a row possible?
+					// TODO: is more than one I in a row possible? yes
 					int is = 0;
 					bool first_i = true;
 					offset_since_last_cigar += edits[j+1] - Is;

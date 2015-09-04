@@ -4,6 +4,7 @@
 #include <unordered_map>
 #include <sstream>
 #include <list>
+#include <algorithm>
 
 #include "RefereeUtils.hpp"
 #include "FastaReader.h"
@@ -40,10 +41,10 @@ class TranscriptsStream {
 
 	unordered_map<string,size_t> ref_offsets;
 
-	// seuqence for the reference
+	// sequence for the reference
 	unordered_map<string, shared_ptr<string>> ref_sequence;
 
-	// path to the reference
+	// path to the file containing reference sequences
 	string ref_path;
 
 	int read_len = 0;
@@ -238,6 +239,14 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////
+	vector<int> getTranscriptIDs() {
+		vector<int> all_ids;
+		for (auto p : t_map) all_ids.push_back(p.first);
+		sort(all_ids.begin(), all_ids.end());
+		return all_ids;
+	}
+
+	////////////////////////////////////////////////////////////////
 	string getMapping(int ref_id) {
 		return t_map[ref_id];
 	}
@@ -249,11 +258,6 @@ public:
 	////////////////////////////////////////////////////////////////
 	void setMapping(int ref_id, string ref_name) {
 		t_map[ref_id] = ref_name;
-	}
-
-	////////////////////////////////////////////////////////////////
-	int getReadLength() {
-		return read_len;
 	}
 
 	////////////////////////////////////////////////////////////////

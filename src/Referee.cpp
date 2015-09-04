@@ -126,6 +126,10 @@ int main(int argc, char * argv []) {
         // decompress
         //
         ////////////////////////////////////////////////
+        // trim input name. assuming <fname>.sam<.optional stuff>
+        auto first_occurrence = p.input_file.find(".sam");
+        p.input_file = p.input_file.substr(0, first_occurrence + 4);
+
         string fname_out = p.input_file + ".recovered";
         if (p.ref_file.size() == 0) {
             cerr << "[ERROR] Missing a reference path." << endl;

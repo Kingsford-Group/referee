@@ -598,11 +598,15 @@ public:
 
 		ofstream head_out(file_name + ".head");
 		/*SAM_hdr*/ auto* h = parser.header();
+		// get version information and record it in the *.head file
+		auto version_type = sam_hdr_find(h, "HD", NULL, NULL);
+		head_out << "HD " << version_type->tag->str << endl;
+
 		auto num_ref = h->nref;
 		for (auto i = 0; i < num_ref; i++) {
 			// cerr << "i=" << i << " " << h->ref[i].name << endl;
 			ref_seq_handler.setMapping(i, h->ref[i].name);
-			head_out << i << " " << h->ref[i].name << endl;
+			head_out << i << " " << h->ref[i].name << " " << h->ref[i].len << endl;
 		}
 
 		// cerr << "==========" << endl;

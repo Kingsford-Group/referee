@@ -39,11 +39,11 @@ void * parseSAM( void * pa) {
 		c.compress();
 		// finished parsing SAM -- might have data remaining in the buffers
 		auto end_time = chrono::system_clock::now();
-		cerr << "Parsing wall time: " << chrono::duration_cast<chrono::microseconds>(end_time - start_time).count() << " us" << endl;
+		// cerr << "Parsing wall time: " << chrono::duration_cast<chrono::microseconds>(end_time - start_time).count() << " us" << endl;
 		// flush all output buffers (get rid of remaining packets)
 		outs.flush();
 		auto flush_time = chrono::system_clock::now();
-		cerr << "Flushing wall time: " << chrono::duration_cast<chrono::microseconds>(flush_time - end_time).count() << "us" << endl;
+		// cerr << "Flushing wall time: " << chrono::duration_cast<chrono::microseconds>(flush_time - end_time).count() << "us" << endl;
 		// let courier know that no more packages are coming
 		courier->finish();
 		// cerr << "finished parsing" << endl;

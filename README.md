@@ -31,9 +31,5 @@ Options:
 	--discardSecondary   discard secondary alignments
 
 	view chrK:L-M        retrieve data from interval [L,M) on chromosome K
-	
+
 	-h, --help           this help
-
-##### TODO
-
-- [ ] merge plzipso code with referee (only using a subset of those functions anyway)
