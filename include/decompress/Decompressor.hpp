@@ -160,12 +160,12 @@ public:
 		is.edits->seekToBlockStart(-1, 0, 0);
 		is.left_clips->seekToBlockStart(-1, 0, 0);
 		is.right_clips->seekToBlockStart(-1, 0, 0);
-		// if (is.flags == nullptr) cerr << "Flags stream is not set up" << endl;
 		is.flags->seekToBlockStart(-1, 0, 0);
 		is.readIDs->seekToBlockStart(-1, 0, 0);
+		is.qualities->seekToBlockStart(-1, 0, 0);
 
 		int ref_id = is.offs->getCurrentTranscript();
-		cerr << "Starting with transcript " << ref_id << endl;
+		// cerr << "Starting with transcript " << ref_id << endl;
 		int i = 0;
 		while ( is.offs->hasMoreOffsets() ) {
 			// zero-based offsets
@@ -203,6 +203,10 @@ public:
 			}
 		}
 		cerr << endl;
+
+		cerr << "quals covered: " << quals_covered << endl;
+		cerr << "new qual requested: " << new_requested << endl;
+
 		recovered_file.close();
 	}
 
@@ -256,10 +260,8 @@ public:
 			if (offset == END_OF_TRANS) {
 				ref_id = is.offs->getNextTranscript();
 				if (ref_id == END_OF_STREAM) {
-					// cerr << "Done" << endl;
 					return;
 				}
-				// cerr << "chr=" << transcripts.getMapping(ref_id) << " ";
 			}
 			else if (offset == END_OF_STREAM) {
 				// break
@@ -272,13 +274,11 @@ public:
 					// cerr << "done with edits" << endl;
 					// break;
 				}
-				// cerr << "has edit: " << edits.hasEdits() << endl;
 
 				reconstructAlignment(offset, read_len, ref_id, transcripts,
 					is.edits,
 					is.left_clips, is.right_clips, is.readIDs, is.flags, is.qualities,
 					options);
-
 			}
 			i++;
 			if (i % 1000000 == 0) {
@@ -308,7 +308,6 @@ private:
 
 	////////////////////////////////////////////////////////////////
 	// reconstructs read without edits
-	// TODO: fill out a iolib staden BAM record and write to a bam format
 	// offset is 0-based
 	////////////////////////////////////////////////////////////////
 	void reconstructAlignment(int offset, int read_len, int ref_id,
@@ -345,10 +344,7 @@ private:
 				read_id = read_ids->getNextID(status);
 				if (status != SUCCESS) read_id = "*";
 			}
-			// cerr << read_id << endl;
-			// cerr << recovered_file << endl;
 			recovered_file << read_id << "\t";
-			// cerr << "wrote to file" << endl;
 		}
 
 		int flag = -1, mapq = -1, rnext = -1, pnext = -1, tlen = -1;
@@ -394,22 +390,31 @@ private:
 			if ( (options & D_QUALS) || (options & D_OPTIONAL_FIELDS) )
 				recovered_file << "\t";
 		}
-		// TODO: write out qual vector
+		// write out qual vector
+		bool secondary_alignment = (flag >= 0) ? (flag & 0x100) > 0 : true;
 		if (options & D_QUALS) {
-			recovered_file << qualities->getNextQualVector() << "\t";
+			quals_covered++;
+			if (secondary_alignment)
+				recovered_file << "*";
+			else {
+				new_requested++;
+				recovered_file << qualities->getNextQualVector();
+			}
 		}
 		else {
-			recovered_file << "*\t";
+			recovered_file << "*";
 		}
 		// cerr << "wrote out quals" << endl;
 
 		if (options & D_OPTIONAL_FIELDS) {
 			if (has_edits)
-				recovered_file << md_string << " ";
+				recovered_file << "\t" << md_string << " ";
 			// TODO: write out other optional fields
 		}
 		recovered_file << endl;
 	}
+	int quals_covered = 0;
+	int new_requested = 0;
 
 	////////////////////////////////////////////////////////////////
 	// build CIGAR, MD strings for the read with edits
@@ -597,9 +602,8 @@ private:
 				case 'Y':
 				case 'Z': {
 					/* insert bases into the reference to recover the original read */
-					// TODO: if several Is in a row -- need to handle them together
+					// TODO: if several Is in a row -- can we handle them together?
 					// if Is are disjoint -- will handle them separately
-					// TODO: is more than one I in a row possible? yes
 					int is = 0;
 					bool first_i = true;
 					offset_since_last_cigar += edits[j+1] - Is;
@@ -674,7 +678,7 @@ private:
 			}
 			j++;
 		}
-		// TODO: update read w/ right soft/hard clip if it took place
+		// update read w/ right soft/hard clip if it took place
 		if (last_cigar_edit_pos < read_len) {
 			if (right_cigar.size() > 0) {
 				cigar += to_string(read_len - last_cigar_edit_pos - right_clip.length());

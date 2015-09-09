@@ -10,7 +10,7 @@ maintains OutputBuffers for the clusters
 
 #include "QualityCluster.hpp"
 
-
+#define GENERIC_PILE_ID 0
 
 
 chrono::duration<double> elapsed_seconds_d2_loop2;
@@ -154,66 +154,8 @@ string to_cigar(string const & s) {
 //
 ////////////////////////////////////////////////////////////////
 class QualityCompressor {
-public:
-	///////////////////////////////////////////////////////////
-	QualityCompressor(Packet_courier * c, shared_ptr<ofstream> gc_out, string const & fname, float pa, int bs, int k):
-		courier(c),
-		genomic_coord_out(gc_out),
-		fname(fname),
-		percent_abundance(pa), 
-		bootstrap_size(bs), 
-		K_c(k) {
-			others = shared_ptr<QualityCluster>(new QualityCluster(courier, true));
-	}
 
-	~QualityCompressor() {
-		for (auto cluster : clusters) {
-			cluster->closeOutputStream();
-		}
-		others->closeOutputStream();
-
-		// write out cluster membership
-		ofstream cluster_out(fname + ".k=" + to_string(K_c) + ".membership" );
-		for (auto m : cluster_membership) cluster_out << m << " ";
-		cluster_out.close();
-
-		// cerr << endl << "Total times in d2 loops: " << elapsed_seconds_d2_loop1.count() << "," <<
-			// elapsed_seconds_d2_loop2.count() << "," << elapsed_seconds_d2_loop3.count() << "sec" << endl;
-		// cerr << "Total mode time: " << elapsed_mode_time.count() << "s" << endl;
-		// cerr << "Total trimming time: " << elapsed_trim_ends.count() << "s" << endl;
-		// cerr << "Total writing time: " << elapsed_writes.count() << "s" << endl;
-	}
-
-	///////////////////////////////////////////////////////////
-	void handleRead(char * qual_read, int len, GenomicCoordinate & gc) {
-		string s;
-		// TODO: is this a documented fact that need to add '!'
-		for (auto i = 0; i < len; i++) s += qual_read[i] + '!';
-		if (observed_vectors <= bootstrap_size) {
-			assignQualityVector(s, len, observed_vectors);
-			if (observed_vectors == bootstrap_size) {
-				// cerr << "Time in d2: loop1 " << elapsed_seconds_d2_loop1.count() << "s" << endl;
-				// cerr << "Time in d2: loop2 " << elapsed_seconds_d2_loop2.count() << "s" << endl;
-				// cerr << "Time in d2: loop3 " << elapsed_seconds_d2_loop3.count() << "s" << endl;
-				// exit(1);
-				refineClusters();
-			}
-		}
-		else {
-			// have fixed clusters -- assign read to one of the existing clusters, output
-			// assignQualityVector(s, len, observed_vectors, false);
-			writeToCluster(s, len, observed_vectors, gc);
-		}
-		observed_vectors++;
-	}
-
-	///////////////////////////////////////////////////////////
-	void flush() {
-		for (auto c : clusters) c->flush();
-		others->flush();
-	}
-
-private:
+	GenomicCoordinate startCoord, endCoord;
 
 	shared_ptr<ofstream> genomic_coord_out;
 
@@ -227,16 +169,21 @@ private:
 
 	int K_c = 3;
 
-	int generic_pile_id = 0;
-
-	vector<int> cluster_membership;
-
 	// clusters
 	vector<shared_ptr<QualityCluster>> clusters;
+
 	// used to hold quality vectors that do not fit anywhere else
 	shared_ptr<QualityCluster> others;//(new QualityCluster());
 
+	shared_ptr<OutputBuffer> cluster_membership;
+
 	string fname; // path to the original sam file
+
+	int members_wrote = 0;
+	void writeMembership(const int id, GenomicCoordinate & gc, size_t num_alignm) {
+		writeClusterMembership(id, cluster_membership, gc, num_alignm);
+		members_wrote++;
+	}
 
 	///////////////////////////////////////////////////////////
 	// Assumes that q_v is already reversed according to the reverse complement bit
@@ -247,7 +194,7 @@ private:
 		if (mode_frequency < 0.26 * q_v_len) {
 			others->add(q_v, id);
 			// record the the vector when into a general pile
-			cluster_membership.push_back(generic_pile_id);
+			// cluster_membership.push_back(GENERIC_PILE_ID);
 			return;
 		}
 		else {
@@ -262,7 +209,7 @@ private:
 				if (d < 0.05) {
 					found = true;
 					clust->add(q_v, id, prefix, suffix);
-					cluster_membership.push_back(clust->getClusterID());
+					// cluster_membership.push_back(clust->getClusterID());
 					break;
 				}
 			}
@@ -296,13 +243,14 @@ private:
 		elapsed_writes += (end - start);
 	}
 
-	void writeToCluster(string & q_v, int q_v_len, int id, GenomicCoordinate & gc) {
+	/////
+	void writeToCluster(string & q_v, int q_v_len, int num_align, GenomicCoordinate & gc) {
 		int mode_frequency = 0;
 		char m = weighted_mode(q_v, mode_frequency);
 		if (mode_frequency < 0.26 * q_v_len) {
 			write(q_v, others, gc);
 			// record the the vector when into a general pile
-			cluster_membership.push_back(generic_pile_id);
+			writeMembership(GENERIC_PILE_ID, gc, num_align);
 			return;
 		}
 		else {
@@ -316,14 +264,14 @@ private:
 				float d = d2_fast(clust->getProfileKmers(), clust->getProfileSize() - K_c + 1.0f, q_kmers, f2);
 				if (d < 0.05) {
 					write(q_v, prefix, suffix, clust, gc);
-					cluster_membership.push_back(clust->getClusterID());
+					writeMembership( clust->getClusterID(), gc, num_align );
 					return;
 				}
 			}
 
 			if (!found) {
 				write(q_v, others, gc);
-				cluster_membership.push_back(generic_pile_id);
+				writeMembership( GENERIC_PILE_ID, gc, num_align );
 			}
 		}
 	}
@@ -334,9 +282,12 @@ private:
 	void refineClusters() {
 		// allocate enough for the bootstrap vectors, initialize to 0 to idicate
 		// membership in the generic pile
-		cluster_membership.resize(observed_vectors, generic_pile_id);
+		// cluster_membership.resize(observed_vectors, GENERIC_PILE_ID);
+		// vector(size, value)
+		vector<int> temp_cluster_ids(observed_vectors, GENERIC_PILE_ID);
+
 		cerr << "Initial clusters: " << clusters.size() << endl;
-		int clust_id = generic_pile_id + 1; // all other cluster IDs will have ids starting with 1
+		int clust_id = GENERIC_PILE_ID + 1; // all other cluster IDs will have ids starting with 1
 		vector<int> remove;
 		cerr << "[INFO] Filtering clusters that are too small..." << endl;
 		for (auto i = 0; i < clusters.size(); i++) {
@@ -348,24 +299,24 @@ private:
 				clust->setClusterID(clust_id);
 				cerr << "Cluster " << clust_id << ": " << (percent * 100) << "% of vectors seen so far" << endl;
 				// record cluster membership for items in this cluster
-				clust->fillOutClusterMembership(cluster_membership);
+				// clust->fillOutClusterMembership(cluster_membership);
+				clust->fillOutClusterMembership(temp_cluster_ids);
 				clust_id++; // only increment for the clusters that we will retain
 			}
 			else {
 				remove.push_back(i);
-				// reassign cluster's data to the "others" pile
-				// cerr << "merging ";
-				// TODO: merge
-				// others->mergeCluster(clust);
-				// for (auto v : clust->data) {
-				// 	others->data.push_back(v);
-				// }
-				// cluster membership is in the sh-pile by default -- no need to update
-				// cerr << "next ";
 			}
 		}
 		// merge vectors in the clusters that were too small into a sh*tpile
 		cerr << "[INFO] merging vectors from rejected clusters..." << endl;
+
+		int i = 1;
+		 // TODO empty genomic coord -- set appropriately
+		cerr << "writing " << temp_cluster_ids.size() << " bootstrap qual memb" << endl;
+		for (auto id : temp_cluster_ids) {
+			writeMembership(id, startCoord, i);
+			i++;
+		}
 
 		while (remove.size() > 0) {
 			int idx = remove.back();
@@ -385,6 +336,75 @@ private:
 
 		others->openOutputStream(fname, genomic_coord_out, K_c);
 		others->flushBootstrapData();
+	}
+
+public:
+	///////////////////////////////////////////////////////////
+	QualityCompressor(Packet_courier * c, shared_ptr<ofstream> gc_out, string const & fname, float pa, int bs, int k):
+		courier(c),
+		genomic_coord_out(gc_out),
+		fname(fname),
+		percent_abundance(pa), 
+		bootstrap_size(bs), 
+		K_c(k) {
+			others = shared_ptr<QualityCluster>(new QualityCluster(courier, true));
+
+			cluster_membership = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
+				gc_out, fname, ".membership.lz", 3 << 20,  12 ) );
+	}
+
+	~QualityCompressor() {
+		cerr << "wrote " << members_wrote << " membership ids" << endl;
+		cluster_membership->flush();
+		for (auto cluster : clusters) {
+			cluster->closeOutputStream();
+		}
+		others->closeOutputStream();
+
+		// cerr << endl << "Total times in d2 loops: " << elapsed_seconds_d2_loop1.count() << "," <<
+			// elapsed_seconds_d2_loop2.count() << "," << elapsed_seconds_d2_loop3.count() << "sec" << endl;
+		// cerr << "Total mode time: " << elapsed_mode_time.count() << "s" << endl;
+		// cerr << "Total trimming time: " << elapsed_trim_ends.count() << "s" << endl;
+		// cerr << "Total writing time: " << elapsed_writes.count() << "s" << endl;
+	}
+
+	void setInitialCoordinate(int chromo, int offset) {
+		startCoord.chromosome = chromo;
+		startCoord.offset = offset;
+		cluster_membership->setInitialCoordinate(chromo, offset);
+	}
+
+	void setLastCoordinate(int c, int off, size_t num) {
+		endCoord.chromosome = c;
+		endCoord.offset = off;
+		// observed_vectors = num;
+		cluster_membership->setLastCoordinate(c, off, num);
+	}
+
+	///////////////////////////////////////////////////////////
+	void handleRead(char * qual_read, int len, GenomicCoordinate & gc) {
+		string s;
+		// TODO: is this a documented fact that need to add '!'
+		for (auto i = 0; i < len; i++) s += qual_read[i] + '!';
+		if (observed_vectors <= bootstrap_size) {
+			assignQualityVector(s, len, observed_vectors);
+			if (observed_vectors == bootstrap_size) {
+				refineClusters();
+			}
+		}
+		else {
+			// have fixed clusters -- assign read to one of the existing clusters, output
+			writeToCluster(s, len, observed_vectors, gc);
+		}
+		observed_vectors++;
+	}
+
+	///////////////////////////////////////////////////////////
+	void flush() {
+		cerr << "flushing quals" << endl;
+		cluster_membership->flush();
+		for (auto c : clusters) c->flush();
+		others->flush();
 	}
 };
 

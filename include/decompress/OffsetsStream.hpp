@@ -28,7 +28,7 @@ public:
 	pair<int, unsigned long> seekToBlockStart(int ref_id, int const start_coord, int const end_coord) {
 		bool is_transcript_start = false;
 		pair<int,unsigned long> p = data_in->loadOverlappingBlock(ref_id, start_coord, end_coord, is_transcript_start);
-		cerr << "Offsets: " << p.first << "," << p.second << " is_start: " << is_transcript_start << endl;
+		// cerr << "Offsets: " << p.first << "," << p.second << " is_start: " << is_transcript_start << endl;
 		if (p.first < 0) {
 			cerr << "[ERROR] Could not navigate to the begining of the interval" << endl;
 			exit(1);
@@ -95,7 +95,7 @@ public:
 	////////////////////////////////////////////////////////////////////////
 	int getNextOffset() {
 		if (current_transcript < 0) {
-			cerr << "transcript < 0 " << current_transcript << endl;
+			// cerr << "transcript < 0 " << current_transcript << endl;
 			return END_OF_TRANS;
 		}
 		else if (current_multiplier > 0) {

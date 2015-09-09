@@ -209,8 +209,6 @@ public:
 				}
 				// insert before i-th element
 				// TODO: this is O(n), should use another data structure
-				// TODO: do we need to insert the IDs themselves?
-				// ids.insert(ids.begin() + i, cluster->ids[j]);
 				ids.push_back(cluster->ids[j]); // order does not matter -- it is an index
 				data.insert( data.begin() + i, cluster->prefices[j] + cluster->data[j] + cluster->suffices[j] );
 				j++;
@@ -227,21 +225,19 @@ public:
 	}
 
 	////////////////////////////////////////////////////////////////
-	void openOutputStream(string & fname, shared_ptr<ofstream> genomic_coords_out, int K_c) {
-		string fname_prefix = fname + ".k=" + to_string(K_c);
-		// TODO: set dictionary size, match len parameters
+	void openOutputStream(string & fname_prefix, shared_ptr<ofstream> genomic_coords_out, int K_c) {
 		if (cluster_id < 0 || is_pile) {
 			output_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
-				genomic_coords_out, fname_prefix, ".other.lz", 3 << 20,  12 ) ); // equivalent of -4
+				genomic_coords_out, fname_prefix, ".quals.other.lz", 3 << 20,  12 ) ); // equivalent of -4
 		}
 		else {
 			output_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
-				genomic_coords_out, fname_prefix, "." + to_string(cluster_id) + ".lz" ) );
+				genomic_coords_out, fname_prefix, ".quals." + to_string(cluster_id) + ".lz" ) );
 			// prefices, suffices
 			prefix_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
-				genomic_coords_out, fname_prefix, "." + to_string(cluster_id) + ".prefix.lz" ) );
+				genomic_coords_out, fname_prefix, ".quals." + to_string(cluster_id) + ".prefix.lz" ) );
 			suffix_str = shared_ptr<OutputBuffer>(new OutputBuffer(courier, 
-				genomic_coords_out, fname_prefix, "." + to_string(cluster_id) + ".suffix.lz" ) );
+				genomic_coords_out, fname_prefix, ".quals." + to_string(cluster_id) + ".suffix.lz" ) );
 		}
 	}
 

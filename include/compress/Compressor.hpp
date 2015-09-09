@@ -25,9 +25,6 @@
 #include "RefereeUtils.hpp"
 #include "TranscriptsStream.hpp"
 
-
-
-
 ////////////////////////////////////////////////////////////////
 //
 //
@@ -46,7 +43,6 @@ public:
 	shared_ptr<OutputBuffer> right_clips_buf;
 	shared_ptr<OutputBuffer> ids_buf;
 	shared_ptr<OutputBuffer> flags_buf;
-	// shared_ptr<OutputBuffer> quals_buf;
 	shared_ptr<QualityCompressor> quals_buf;
 	shared_ptr<OutputBuffer> opt_buf;
 	shared_ptr<OutputBuffer> unaligned_buf;
@@ -76,8 +72,7 @@ public:
 		if (!seq_only) {
 			ids_buf->setInitialCoordinate(chromo, offset);
 			flags_buf->setInitialCoordinate(chromo, offset);
-			// TODO
-			// quals_buf->setInitialCoordinate(chromo, offset);
+			quals_buf->setInitialCoordinate(chromo, offset);
 			opt_buf->setInitialCoordinate(chromo, offset);
 		}
 	}
@@ -92,8 +87,7 @@ public:
 		if (!seq_only) {
 			ids_buf->setLastCoordinate(chromo, offset, num);
 			flags_buf->setLastCoordinate(chromo, offset, num);
-			// TODO
-			// quals_buf->setLastCoordinate(chromo, offset, num);
+			quals_buf->setLastCoordinate(chromo, offset, num);
 			opt_buf->setLastCoordinate(chromo, offset, num);
 		}
 	}
@@ -426,15 +420,17 @@ private:
 		// }
 		// writeName2(remapped_name, out_buffers.ids_buf);
 	}
-	// TODO: write out the dictionary
 
-	// TODO: can only initialize parameters w/in constructors?
 	// QualityCompressor qual_compressor;
 	////////////////////////////////////////////////////////////////
+	int total_quals = 0;
+	int primary = 0;
 	void handleQuals(IOLibAlignment & al) {
+		total_quals++;
 		if ( !al.isPrimary() && discard_secondary_alignments ) return;
 
 		if (al.isPrimary()) {
+			primary++;
 			// haven't seen the read before -- output the quals
 			auto len = al.read_len();
 			auto* q = al.quals();
@@ -448,18 +444,13 @@ private:
 			}
 			GenomicCoordinate gc(al.ref(), al.offset());
 			out_buffers.quals_buf->handleRead(q, len, gc);
-			// qual_compressor.handleRead(q, len);
-
-			// just plzip
-			// writeQualVector(q, len, out_buffers.quals_buf);
 		}
 	}
 
 	////////////////////////////////////////////////////////////////
 	void handleOptionalFields(IOLibAlignment & al) {
-		// find MD and excise it
 		if ( !al.isPrimary() && discard_secondary_alignments ) return;
-		// opt_stream << al.opt_fields() << endl;
+		// find MD and excise it
 		string opt = al.opt_fields();
 		GenomicCoordinate gc(al.ref(), al.offset());
 		writeOpt(opt, out_buffers.opt_buf, gc, count);
@@ -488,7 +479,6 @@ private:
 			seq = r_seq;
 		}
 		unaligned_reads.emplace_back(al.read_name(), al.read_name_len(), seq, al.quals(), rc);
-		// TODO: 10K - arbitrary parameter, may be as big or as small as one wants
 		if (unaligned_reads.size() >= 10000) {
 			// cerr << "Used rc " << used_rc << " ";
 			flushUnalignedReads();
@@ -602,12 +592,9 @@ public:
 
 		auto num_ref = h->nref;
 		for (auto i = 0; i < num_ref; i++) {
-			// cerr << "i=" << i << " " << h->ref[i].name << endl;
 			ref_seq_handler.setMapping(i, h->ref[i].name);
 			head_out << i << " " << h->ref[i].name << " " << h->ref[i].len << endl;
 		}
-
-		// cerr << "==========" << endl;
 
 		int line_id = 0;
 		IOLibAlignment last_aligned;
@@ -622,7 +609,6 @@ public:
 	        	last_aligned = al;
 	        	if (first) {
 	        		head_out << "read_len=" << al.read_len() << endl;
-	        		// head_out.close();
 	        	}
 	            processRead(al, first);
 	            first = false;
@@ -645,7 +631,9 @@ public:
 
 	    // output the last offset
 	    outputPair(offset_pair, prev_ref, prev_offset);
-	    // processHasEditsBits(edit_flags, file_name);
+	    
+	    cerr << "saw " << total_quals << "qual vector" << endl;
+	    cerr << "of them primary " << primary << endl;
 	}
 
 };

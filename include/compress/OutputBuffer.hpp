@@ -55,12 +55,10 @@ public:
 		match_len_limit(match_len) {
 		int flags = O_CREAT | O_WRONLY | o_binary;
 		out_fd = open( (fn + suff).c_str(), flags, outfd_mode );
-		// cerr << "Opened " << fn << suff << " stream for compressed data (fd=" << out_fd << ")" << endl;
 	}
 
 	///////////////////////////////////////////////////////////
 	~OutputBuffer() {
-		// cerr << "Closing fd=" << out_fd << ", processed " << total_bytes << " bytes; ";
 		close(out_fd);
 	}
 
@@ -117,13 +115,14 @@ public:
 
 	friend void writeUnaligned(UnalignedRead & read, bool seq_only, shared_ptr<OutputBuffer> o_str);
 
+	friend void writeClusterMembership(int cluster_id, shared_ptr<OutputBuffer> ptr, GenomicCoordinate & coord, size_t num);
+
 	////////////////////////////////////////////////////////////////
 	// stream size
 	int size() { return data.size(); }
 
 	void flush() {
 		// TODO: last chromosome, max coordinate
-		// cerr << "flushing " << stream_suffix << endl;
 		GenomicCoordinate g(std::numeric_limits<int>::max(), std::numeric_limits<int>::max());
 		compressAndWriteOut(g, num_alignments, true);
 	}
@@ -161,7 +160,6 @@ private:
 	//
 	////////////////////////////////////////////////////////////////
 	void compressAndWriteOut(GenomicCoordinate & currentCoord, size_t num_alignments, bool flush_all = false) {
-		// cerr << stream_suffix << " data:" << data.size() << " D: " << dictionary_size << endl;
 		int data_size = data.size();
 		total_bytes += data_size;
 
@@ -387,6 +385,12 @@ void writeString(string & s, shared_ptr<OutputBuffer> o_str, GenomicCoordinate &
 	for (auto c : s) o_str->data.push_back(c);
 	o_str->data.push_back('\n');
 	if (o_str->timeToDump()) o_str->compressAndWriteOut(coord, num);
+}
+
+void writeClusterMembership(int cluster_id, shared_ptr<OutputBuffer> o_str, GenomicCoordinate & gc, size_t num) {
+	for (auto c : to_string(cluster_id)) o_str->data.push_back(c);
+		o_str->data.push_back(' ');
+	if (o_str->timeToDump()) o_str->compressAndWriteOut(gc, num);
 }
 
 #endif

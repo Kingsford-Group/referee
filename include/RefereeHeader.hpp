@@ -51,6 +51,7 @@ public:
 		int t_index = 0;
 		string line, t_name, type, chromo;
 		while (getline(f_in, line)) {
+			// cerr << line << endl;
 			if (line.find("HD") != string::npos) {
 				// version
 				auto idx = line.find(separator);
@@ -84,7 +85,9 @@ public:
 				lengths[t_index] = length;
 			}
 		}
+		// cerr << "closing" << endl;
 		f_in.close();
+		// cerr << "closed" << endl;
 		return t_map;
 	}
 

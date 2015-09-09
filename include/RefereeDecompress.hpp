@@ -117,6 +117,7 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 	streams_used.insert(".offs.lz"); streams_used.insert(".edits.lz"); streams_used.insert(".has_edits.lz");
 	streams_used.insert(".left_clip.lz"); streams_used.insert(".right_clip.lz");
 	streams_used.insert(".flags.lz"); streams_used.insert(".ids.lz");
+	streams_used.insert(".membership.lz");
 
 	// parse head file and get transcript mapping as well as remappings of the 
 	// flags, mapq, and other numerical fields
@@ -128,22 +129,19 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 	unordered_map<int,int> mapq_map = header.getMapqEncoding(),
 		rnext_map = header.getRnextEncoding();
 
-	// vector<shared_ptr<InputBuffer>> input_buffers;
-	// TODO: don't need the buffer_map anymore
 	unordered_set<string> suffixes;
 	for (auto pair : all_intervals) {
 		auto suffix = pair.first;
 		auto intervals = pair.second;
 
-		// cerr << suffix << endl;
-		
 		if (suffixes.find(suffix) != suffixes.end() ) 
 			// already saw this suffix and initialized buffers for it
 			continue;
+
 		// not processing some streams
 		if (streams_used.find(suffix) == streams_used.end()) continue;
 		shared_ptr<InputBuffer> buf(new InputBuffer(file_name + suffix, intervals, buffer_size, buffer_id));
-		// TODO: do we use this ID anywhere? was mean for hte parallel
+		// TODO: do we use this ID anywhere? was meant for the parallel version
 		buffer_map.emplace(buffer_id++, buf);
 		if (suffix.compare(".offs.lz") == 0) {
 			input_streams.offs = shared_ptr<OffsetsStream>(new OffsetsStream(buf) );
@@ -166,6 +164,9 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 		else if (suffix.compare(".ids.lz") == 0) {
 			input_streams.readIDs = shared_ptr<ReadIDStream>(new ReadIDStream(buf) );
 		}
+		else if (suffix.compare(".membership.lz") == 0) {
+			input_streams.qualities = shared_ptr<QualityStream>(new QualityStream(buf, file_name, all_intervals, buffer_size) );
+		}
 		suffixes.insert(suffix);
 	}
 
@@ -182,7 +183,7 @@ int decompressFileSequential(string const & file_name, string const & ref_file_n
 	else {
 		// keep stitching alignments while there is data available
 		Decompressor D(file_name, fname_out, ref_file_name);
-		D.decompress(header, input_streams, D_SEQ | D_FLAGS | D_READIDS | D_OPTIONAL_FIELDS);
+		D.decompress(header, input_streams, D_READIDS | D_SEQ | D_FLAGS /*| D_QUALS*/ | D_OPTIONAL_FIELDS);
 	}
 }
 

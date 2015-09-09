@@ -151,7 +151,7 @@ class InputBuffer {
 	int buffer_size;
 
 	void readMoreLZIPBlocks() {
-		cerr << "read mode blocks " << name << " q: " << block_queue.size() << endl;
+		// cerr << "read mode blocks " << name << " q: " << block_queue.size() << endl;
 		if (block_queue.size() > 0) {
 			auto block = block_queue.front();
 			block_queue.pop_front();
@@ -383,7 +383,7 @@ public:
 			return make_pair(start_block->start, start_block->num_alignments);
 		}
 		else if (chromo == -1) {
-			cerr << "Loading the very first block" << endl;
+			// cerr << "Loading the very first block" << endl;
 			// add all blocks from all trees (in order) to the block queue
 			for (auto tree_p : chromosome_trees) {
 				auto tree = tree_p.second;

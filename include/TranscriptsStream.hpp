@@ -178,7 +178,6 @@ class TranscriptsStream {
 			}
 			fai_in.close();
 		}
-		cerr << "Found " << fai_index.size() << " index entries" << endl;
 		return fai_index;
 	}
 

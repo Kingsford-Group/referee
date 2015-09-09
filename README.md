@@ -2,7 +2,9 @@
 
 ##### Dependencies
 
-Staden IO_Lib
+[Staden io_Lib](http://sourceforge.net/projects/staden/files/io_lib/)
+
+[LZLib](http://www.nongnu.org/lzip/lzlib.html)
 
 ##### Installation
 

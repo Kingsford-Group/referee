@@ -66,7 +66,6 @@ Output_args initializeOutputStreams(string & name_prefix, bool seq_only,
 		oa.flags_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".flags.lz" ) );
 		oa.ids_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".ids.lz", 3 << 20,  12 ) );
 		oa.opt_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, name_prefix, ".opt.lz" ) );
-		// oa.quals_buf = shared_ptr<OutputBuffer>(new OutputBuffer(courier, intervals, (name_prefix + ".quals.lz").c_str() ) );
 		oa.quals_buf = shared_ptr<QualityCompressor>(new QualityCompressor(courier, intervals, name_prefix.c_str(), 0.05, 200000, 4 ) );
 	}
 	return oa;

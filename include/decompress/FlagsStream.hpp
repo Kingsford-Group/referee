@@ -8,8 +8,7 @@
 
 class FlagsStream : public InputStream {
 
-	// shared_ptr<InputBuffer> flags_in;
-
+	// mappings from Referee codes to actual values
 	unordered_map<int,short> & r_flags_map;
 
 	unordered_map<int,int> & r_mapq_map;
